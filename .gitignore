@@ -1,3 +1,7 @@
+# Build artifacts directory – keep the folder but ignore its contents
+build/*
+!build/.gitkeep
+
 # Prerequisites
 *.d
 
