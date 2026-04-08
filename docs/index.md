@@ -20,6 +20,20 @@ compiladores1/
 | `tests/` | Contém os casos de teste para validar o compilador. |
 | `build/` | Destino dos artefatos gerados pela compilação. Ignorado pelo Git. |
 
+## Subconjunto de gramática C usado
+
+Neste projeto é usado um subconjunto da linguagem C, que inclui:
+
+- Declaração de variáveis
+- Atribuição de variáveis
+- Operadores aritméticos
+- Operadores relacionais
+- Operadores lógicos
+- Estruturas condicionais `if` e `else`
+- Estruturas de repetição `while` e `for`
+- Funções
+- Comentários
+
 ## Pré-requisitos
 
 - **flex** ≥ 2.6
