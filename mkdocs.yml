@@ -32,6 +32,8 @@ nav:
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md
   - Contribuição: contributing.md
+  - Relatórios:
+    - Sprint 1: sprint1.md
 
 markdown_extensions:
   - admonition
