@@ -56,6 +56,18 @@ Para a estruturação das regras no analisador sintático, o subconjunto acima f
 <comando_salto> ::= "return" [<expressao>] ";" | "break" ";" | "continue" ";"
 ```
 
+## Especificação de Tokens e Mapeamento
+
+Para a tarefa S1-05, definimos os padrões léxicos e os identificadores que serão passados ao Bison:
+
+| Token | Padrão (Regex) | Descrição |
+| :--- | :--- | :--- |
+| **ID** | `[a-zA-Z_][a-zA-Z0-9_]*` | Identificadores de variáveis/funções |
+| **NUM_INT** | `[0-9]+` | Literais inteiros |
+| **NUM_FLOAT** | `[0-9]*\.[0-9]+` | Literais de ponto flutuante |
+| **STRING** | `\"([^\\\"]|\\.)*\"` | Literais de string |
+| **TK_OP** | `+`, `-`, `*`, `/`, `=`, `==`, `!=` | Operadores aritméticos e lógicos |
+
 ## Limitações e Escopo Não Implementado
 
 Para delimitar o desenvolvimento do compilador, os seguintes recursos não serão suportados:
