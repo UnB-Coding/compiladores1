@@ -26,7 +26,8 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
 "("     { return LPAREN; }
 ")"     { return RPAREN; }
 
-[ \t\n]+  { /* não faz nada */ }
+[ \t]+    { /* ignora espaços e tabs */ }
+\n        { return '\n'; }
 
 .        { printf("Caractere não reconhecido: %s\n", yytext); }
 

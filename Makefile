@@ -1,6 +1,6 @@
 # Nome dos executáveis
-EXEC       = parser_exe
-LEXER_EXEC = lexer_exe
+EXEC       = $(BUILD_DIR)/parser_exe
+LEXER_EXEC = $(BUILD_DIR)/lexer_exe
 BUILD_DIR  = build
 
 # Arquivos-fonte do Bison e do Flex (parser de exemplo)
@@ -32,11 +32,10 @@ LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
 # Regra padrão: compila ambos os executáveis
 all: $(EXEC) $(LEXER_EXEC)
 
-
 # ========================================================
 # Lexer standalone (subconjunto C)
 # ========================================================
-$(LEXER_EXEC): $(LEXER_C)
+$(LEXER_EXEC): $(LEXER_C) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(LEXER_C) $(LDFLAGS)
 
 $(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
@@ -46,12 +45,10 @@ $(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
 # ========================================================
 # Parser de exemplo (expressões aritméticas)
 # ========================================================
-$(EXEC): $(BISON_C) $(FLEX_C)
+$(EXEC): $(BISON_C) $(FLEX_C) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) $(LDFLAGS)
 
-# Cria diretório de build se não existir
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+
 
 # Regra para rodar o Bison: gera parser.tab.c e parser.tab.h em build/
 $(BISON_C) $(BISON_H): $(BISON_FILE) | $(BUILD_DIR)

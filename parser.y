@@ -38,6 +38,15 @@ void yyerror(const char *s);
 
 %%
 
+input:
+      %empty
+    | input line
+    ;
+line:
+      '\n'                  { /* linha vazia */ }
+    | expr '\n'             { printf("Resultado: %d\n", $1); }
+    ;
+
 expr:
       expr PLUS expr    { $$ = $1 + $3; }
     | expr MINUS expr   { $$ = $1 - $3; }
