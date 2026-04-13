@@ -1,17 +1,24 @@
-# Nome do executável final
-EXEC = parser_exe
-BUILD_DIR = build
+# Nome dos executáveis
+EXEC       = parser_exe
+LEXER_EXEC = lexer_exe
+BUILD_DIR  = build
 
-# Arquivos-fonte do Bison e do Flex
+# Arquivos-fonte do Bison e do Flex (parser de exemplo)
 BISON_FILE = parser.y
 FLEX_FILE  = scanner.l
+
+# Arquivo-fonte do Lexer standalone (subconjunto C)
+LEXER_FILE = lexer/lexer.l
 
 # Arquivos que o Bison vai gerar
 BISON_C   = $(BUILD_DIR)/parser.tab.c
 BISON_H   = $(BUILD_DIR)/parser.tab.h
 
-# Arquivo gerado pelo Flex
+# Arquivo gerado pelo Flex (parser de exemplo)
 FLEX_C    = $(BUILD_DIR)/lex.yy.c
+
+# Arquivo gerado pelo Flex (lexer standalone)
+LEXER_C   = $(BUILD_DIR)/lexer.yy.c
 
 # Parâmetros opcionais ao Bison e Flex
 BISON_FLAGS =    # -d gera o arquivo .h (token definitions)
@@ -22,11 +29,23 @@ CC      = gcc
 CFLAGS  =
 LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
 
-# Regra padrão (alvo 'all' vai gerar o executável)
-all: $(EXEC)
+# Regra padrão: compila ambos os executáveis
+all: $(EXEC) $(LEXER_EXEC)
 
 
-# Regra para gerar o executável: depende dos arquivos gerados por Bison e Flex
+# ========================================================
+# Lexer standalone (subconjunto C)
+# ========================================================
+$(LEXER_EXEC): $(LEXER_C)
+	$(CC) $(CFLAGS) -o $@ $(LEXER_C) $(LDFLAGS)
+
+$(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
+	flex $(FLEX_FLAGS) -o $(LEXER_C) $(LEXER_FILE)
+
+
+# ========================================================
+# Parser de exemplo (expressões aritméticas)
+# ========================================================
 $(EXEC): $(BISON_C) $(FLEX_C)
 	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) $(LDFLAGS)
 
@@ -42,6 +61,9 @@ $(BISON_C) $(BISON_H): $(BISON_FILE) | $(BUILD_DIR)
 $(FLEX_C): $(FLEX_FILE) $(BISON_H) | $(BUILD_DIR)
 	flex $(FLEX_FLAGS) -o $(FLEX_C) $(FLEX_FILE)
 
-# Regra de limpeza: remove arquivos gerados
+
+# ========================================================
+# Limpeza
+# ========================================================
 clean:
-	rm -f $(EXEC) $(BISON_C) $(BISON_H) $(FLEX_C)
+	rm -f $(EXEC) $(LEXER_EXEC) $(BISON_C) $(BISON_H) $(FLEX_C) $(LEXER_C)
