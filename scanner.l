@@ -10,6 +10,7 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "parser.tab.h"  /* contém definições geradas pelo Bison (NUM, PLUS, etc.) */
 %}
 
@@ -25,6 +26,12 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
 "/"     { return DIVIDE; }
 "("     { return LPAREN; }
 ")"     { return RPAREN; }
+"="     { return ASSIGN; }
+
+[a-zA-Z_][a-zA-Z0-9_]*  {
+    yylval.strValue = strdup(yytext);
+    return ID;
+}
 
 [ \t]+    { /* ignora espaços e tabs */ }
 \n        { return '\n'; }

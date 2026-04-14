@@ -19,13 +19,15 @@ void yyerror(const char *s);
 /* Define valor semântico (intValue) */
 %union {
     int intValue;
+    char *strValue;
 }
 
 /* Token que carrega valor semântico */
 %token <intValue> NUM
+%token <strValue> ID
 
 /* Tokens sem valor semântico, mas com precedência */
-%token PLUS MINUS TIMES DIVIDE LPAREN RPAREN
+%token PLUS MINUS TIMES DIVIDE LPAREN RPAREN ASSIGN
 
 /* Declara precedência:
    - PLUS e MINUS têm menor precedência
@@ -45,6 +47,7 @@ input:
 line:
       '\n'                  { /* linha vazia */ }
     | expr '\n'             { printf("Resultado: %d\n", $1); }
+    | ID ASSIGN expr '\n'   { printf("%s = %d\n", $1, $3); free($1); }
     ;
 
 expr:
@@ -54,6 +57,7 @@ expr:
     | expr DIVIDE expr  { $$ = $1 / $3; }
     | LPAREN expr RPAREN{ $$ = $2; }
     | NUM               { $$ = $1; }
+    | ID                { printf("Aviso: variável '%s' não definida\n", $1); $$ = 0; free($1); }
     ;
 
 %%
