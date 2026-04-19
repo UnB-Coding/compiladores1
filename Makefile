@@ -26,7 +26,7 @@ FLEX_FLAGS  =      # deixe vazio ou acrescente opções, se necessário
 
 # Parâmetros de compilação
 CC      = gcc
-CFLAGS  =
+CFLAGS  = -I. -Isymbol_table
 LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
 
 # Regra padrão: compila ambos os executáveis
@@ -45,8 +45,8 @@ $(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
 # ========================================================
 # Parser de exemplo (expressões aritméticas)
 # ========================================================
-$(EXEC): $(BISON_C) $(FLEX_C) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) $(LDFLAGS)
+$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c $(LDFLAGS)
 
 
 

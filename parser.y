@@ -11,6 +11,7 @@ Descrição: Exemplo de gramática para expressão aritmética
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include "symtab.h"
 /* Declarações para evitar avisos de função implícita */
 int yylex(void);
 void yyerror(const char *s);
@@ -47,7 +48,7 @@ input:
 line:
       '\n'                  { /* linha vazia */ }
     | expr '\n'             { printf("Resultado: %d\n", $1); }
-    | ID ASSIGN expr '\n'   { printf("%s = %d\n", $1, $3); free($1); }
+    | ID ASSIGN expr '\n'   { sym_set($1, $3); printf("%s = %d\n", $1, $3); free($1); }
     ;
 
 expr:
@@ -57,13 +58,25 @@ expr:
     | expr DIVIDE expr  { $$ = $1 / $3; }
     | LPAREN expr RPAREN{ $$ = $2; }
     | NUM               { $$ = $1; }
-    | ID                { printf("Aviso: variável '%s' não definida\n", $1); $$ = 0; free($1); }
+    | ID                {
+                            SymEntry *e = sym_lookup($1);
+                            if (e) {
+                                $$ = e->value;
+                            } else {
+                                printf("Aviso: variável '%s' não definida\n", $1);
+                                $$ = 0;
+                            }
+                            free($1);
+                          }
     ;
 
 %%
 
 int main(void) {
-    return yyparse();
+    int result = yyparse();
+    sym_print();
+    sym_free();
+    return result;
 }
 
 void yyerror(const char *s) {
