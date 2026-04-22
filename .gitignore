@@ -2,6 +2,7 @@
 build/*
 !build/.gitkeep
 .venv/*
+_pycache__/
 
 # Prerequisites
 *.d

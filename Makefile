@@ -60,7 +60,19 @@ $(FLEX_C): $(FLEX_FILE) $(BISON_H) | $(BUILD_DIR)
 
 
 # ========================================================
+# Executável de teste do lexer (usado pelo pytest)
+# Compila sem -lfl pois tests/lexer_test_main.c fornece o main
+# ========================================================
+LEXER_TEST_EXEC = $(BUILD_DIR)/lexer_test_exe
+LEXER_TEST_MAIN = tests/lexer_test_main.c
+
+$(LEXER_TEST_EXEC): $(LEXER_C) $(LEXER_TEST_MAIN) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(LEXER_C) $(LEXER_TEST_MAIN)
+
+lexer_test: $(LEXER_TEST_EXEC)
+
+# ========================================================
 # Limpeza
 # ========================================================
 clean:
-	rm -f $(EXEC) $(LEXER_EXEC) $(BISON_C) $(BISON_H) $(FLEX_C) $(LEXER_C)
+	rm -f $(EXEC) $(LEXER_EXEC) $(LEXER_TEST_EXEC) $(BISON_C) $(BISON_H) $(FLEX_C) $(LEXER_C)
