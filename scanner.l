@@ -27,14 +27,19 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
 "("     { return LPAREN; }
 ")"     { return RPAREN; }
 "="     { return ASSIGN; }
+";"     { return SEMICOLON; }
+
+"int"       { return T_INT; }
+"float"     { return T_FLOAT; }
+"char"      { return T_CHAR; }
+"bool"      { return T_BOOL; }
 
 [a-zA-Z_][a-zA-Z0-9_]*  {
     yylval.strValue = strdup(yytext);
     return ID;
 }
 
-[ \t]+    { /* ignora espaços e tabs */ }
-\n        { return '\n'; }
+[ \t\n]+  { /* ignora espaços, tabs e quebras de linha */ }
 
 .        { printf("Caractere não reconhecido: %s\n", yytext); }
 
