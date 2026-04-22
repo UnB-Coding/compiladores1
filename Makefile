@@ -29,6 +29,10 @@ CC      = gcc
 CFLAGS  = -I. -Isymbol_table
 LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
 
+# Regra para criar a pasta build
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
 # Regra padrão: compila ambos os executáveis
 all: $(EXEC) $(LEXER_EXEC)
 
