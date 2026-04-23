@@ -1,578 +1,729 @@
 # Guia Completo da Gramática — Compiladores 1 (UnB)
 
-> Referência exaustiva da linguagem aceita pelo parser/lexer implementado em `parser.y` e `scanner.l`.
+> **FGA0003 — Compiladores 1**
+> Curso de Engenharia de Software — Universidade de Brasília (UnB)
+>
+> Referência definitiva da linguagem reconhecida pelo compilador.
+> Gerado a partir dos arquivos-fonte `scanner.l`, `parser.y` e `symbol_table/symtab.h`.
+
+---
+
+## Índice
+
+1. [Visão Geral](#1-visão-geral)
+2. [Estrutura de um Programa](#2-estrutura-de-um-programa)
+3. [Análise Léxica (Scanner)](#3-análise-léxica-scanner)
+   - 3.1 [Palavras Reservadas](#31-palavras-reservadas)
+   - 3.2 [Literais](#32-literais)
+   - 3.3 [Identificadores](#33-identificadores)
+   - 3.4 [Operadores e Pontuação](#34-operadores-e-pontuação)
+   - 3.5 [Espaços em Branco e Comentários](#35-espaços-em-branco-e-comentários)
+4. [Gramática Formal (BNF)](#4-gramática-formal-bnf)
+5. [Sistema de Tipos](#5-sistema-de-tipos)
+   - 5.1 [Tipos Primitivos](#51-tipos-primitivos)
+   - 5.2 [Promoção e Conversão Implícita](#52-promoção-e-conversão-implícita)
+   - 5.3 [Armazenamento Interno (`SymValue`)](#53-armazenamento-interno-symvalue)
+6. [Declaração de Variáveis](#6-declaração-de-variáveis)
+7. [Atribuição](#7-atribuição)
+8. [Expressões](#8-expressões)
+   - 8.1 [Operadores Aritméticos](#81-operadores-aritméticos)
+   - 8.2 [Operadores Relacionais](#82-operadores-relacionais)
+   - 8.3 [Operadores de Igualdade](#83-operadores-de-igualdade)
+   - 8.4 [Operadores Lógicos](#84-operadores-lógicos)
+   - 8.5 [Menos Unário](#85-menos-unário)
+   - 8.6 [Agrupamento com Parênteses](#86-agrupamento-com-parênteses)
+9. [Precedência e Associatividade](#9-precedência-e-associatividade)
+10. [Tabela de Símbolos](#10-tabela-de-símbolos)
+11. [Tratamento de Erros](#11-tratamento-de-erros)
+12. [Sequências de Escape](#12-sequências-de-escape)
+13. [Exemplos Completos](#13-exemplos-completos)
+14. [Limitações Conhecidas](#14-limitações-conhecidas)
 
 ---
 
 ## 1. Visão Geral
 
-A linguagem é um subconjunto imperativo simplificado, com semântica baseada em C. Todas as expressões são avaliadas como **inteiros** (`int`). Valores booleanos são representados internamente como `0` (falso) e `1` (verdadeiro). O programa consiste em uma sequência de **instruções** (*statements*), cada uma terminada por `;`.
+O compilador implementa um **subconjunto da linguagem C** com foco em:
+
+- Declaração e manipulação de variáveis com **tipagem estática** (`int`, `float`, `char`, `bool`).
+- Avaliação de **expressões aritméticas, relacionais e lógicas**.
+- **Conversão implícita de tipos** seguindo regras inspiradas no padrão C.
+- **Divisão inteira** quando ambos operandos são inteiros (semântica C-standard).
+- Suporte a **literais booleanos** (`true` / `false`) como extensão.
+
+O programa é **interpretado linha a linha**: cada declaração ou expressão é avaliada e seu resultado impresso imediatamente.
 
 ---
 
-## 2. Estrutura Léxica (Tokens)
+## 2. Estrutura de um Programa
 
-### 2.1 Palavras Reservadas
+Um programa é uma sequência de zero ou mais **instruções** (*statements*). Cada instrução deve ser terminada com ponto-e-vírgula (`;`). Não há necessidade de uma função `main()` — o código é executado sequencialmente, de cima para baixo.
 
-| Palavra  | Token Bison | Descrição                            |
-|----------|-------------|--------------------------------------|
-| `int`    | `T_INT`     | Tipo inteiro                         |
-| `float`  | `T_FLOAT`   | Tipo ponto flutuante (declaração)    |
-| `char`   | `T_CHAR`    | Tipo caractere (declaração)          |
-| `bool`   | `T_BOOL`    | Tipo booleano                        |
-| `true`   | `TRUE_LIT`  | Literal booleano verdadeiro (= `1`)  |
-| `false`  | `FALSE_LIT` | Literal booleano falso (= `0`)       |
-
-> [!IMPORTANT]
-> `true` e `false` são **literais**, não palavras-chave de tipo. Eles produzem valor semântico `intValue` (`1` e `0` respectivamente).
-
-> [!NOTE]
-> Embora `float` e `char` sejam reconhecidos como tipos válidos para declaração, **toda aritmética e armazenamento interno opera sobre `int`**. A declaração de tipo serve para fins de tipagem na tabela de símbolos, mas o valor armazenado é sempre um inteiro.
-
-### 2.2 Literais
-
-| Padrão Léxico | Token   | Tipo Semântico | Descrição                          |
-|---------------|---------|----------------|------------------------------------|
-| `[0-9]+`      | `NUM`   | `intValue`     | Número inteiro decimal (sem sinal) |
-| `true`        | `TRUE_LIT`  | `intValue` (= 1) | Literal booleano verdadeiro    |
-| `false`       | `FALSE_LIT` | `intValue` (= 0) | Literal booleano falso         |
-
-> [!WARNING]
-> Números de ponto flutuante (`3.14`), negativos (`-5` como literal), hexadecimais (`0xFF`), octais (`077`) e strings (`"hello"`) **não são suportados** como literais. O sinal negativo é tratado como operador unário de subtração (e nesta gramática, **não há operador unário `-`**, então `-5` resulta em `0 - 5` se precedido de uma expressão, ou erro de sintaxe caso contrário).
-
-### 2.3 Identificadores
-
-| Padrão Léxico              | Token | Tipo Semântico | Descrição            |
-|----------------------------|-------|----------------|----------------------|
-| `[a-zA-Z_][a-zA-Z0-9_]*`  | `ID`  | `strValue`     | Nome de variável     |
-
-Regras:
-- Começa com **letra** (`a-z`, `A-Z`) ou **underscore** (`_`)
-- Seguido de zero ou mais letras, dígitos ou underscores
-- **Case-sensitive**: `Var`, `var` e `VAR` são identificadores distintos
-- Palavras reservadas (`int`, `float`, `char`, `bool`, `true`, `false`) têm prioridade sobre identificadores por aparecerem antes na definição do lexer
-
-#### Exemplos válidos
 ```
-x    _temp    myVar    counter1    _a_b_c    MAX_VALUE
+program → line_list
+line_list → ε | line_list line
+line → stmt
 ```
 
-#### Exemplos inválidos
-```
-1abc     (começa com dígito → lexado como NUM seguido de ID)
-int      (palavra reservada)
-my-var   (hífen não é permitido)
-```
+### Tipos de Instrução
 
-### 2.4 Operadores e Pontuação
+| Forma                              | Descrição                                 |
+| ---------------------------------- | ----------------------------------------- |
+| `expr ;`                           | Avalia a expressão e imprime o resultado  |
+| `id = expr ;`                      | Atribui o valor da expressão à variável   |
+| `type id ;`                        | Declara variável sem inicialização        |
+| `type id = expr ;`                 | Declara variável com inicialização        |
+
+---
+
+## 3. Análise Léxica (Scanner)
+
+O analisador léxico (`scanner.l`) reconhece os seguintes tokens:
+
+### 3.1 Palavras Reservadas
+
+| Palavra     | Token     | Descrição                    |
+| ----------- | --------- | ---------------------------- |
+| `int`       | `T_INT`   | Tipo inteiro                 |
+| `float`     | `T_FLOAT` | Tipo ponto flutuante         |
+| `char`      | `T_CHAR`  | Tipo caractere               |
+| `bool`      | `T_BOOL`  | Tipo booleano (extensão)     |
+| `true`      | `TRUE_LIT`| Literal booleano verdadeiro  |
+| `false`     | `FALSE_LIT`| Literal booleano falso      |
+
+> **Nota:** `true` e `false` são tratados como **literais** com valor semântico (`1` e `0`, respectivamente), não como identificadores.
+
+### 3.2 Literais
+
+#### 3.2.1 Literais Inteiros (`NUM`)
+
+Sequência de um ou mais dígitos decimais (`0-9`).
+
+| Exemplo | Valor |
+| ------- | ----- |
+| `0`     | 0     |
+| `42`    | 42    |
+| `1000`  | 1000  |
+
+> Não há suporte a literais hexadecimais (`0x`), octais (`0`) ou binários (`0b`).
+
+#### 3.2.2 Literais de Ponto Flutuante (`FLOAT_LIT`)
+
+Números com ponto decimal. A regra utiliza **maximal munch** — a correspondência mais longa é preferida sobre inteiros.
+
+| Formato        | Exemplos          |
+| -------------- | ----------------- |
+| `dígitos.dígitos` | `3.14`, `0.5`, `100.0` |
+| `dígitos.`     | `3.`, `100.`      |
+| `.dígitos`     | `.5`, `.001`      |
+
+> Não há suporte a notação científica (`1e10`, `3.14e-2`).
+
+#### 3.2.3 Literais de Caractere (`CHAR_LIT`)
+
+Caractere único entre aspas simples, ou uma sequência de escape.
+
+| Formato      | Exemplos                  |
+| ------------ | ------------------------- |
+| Simples      | `'A'`, `'z'`, `'0'`      |
+| Escape       | `'\n'`, `'\t'`, `'\\'`    |
+
+Veja a [Seção 12](#12-sequências-de-escape) para a lista completa de escapes suportados.
+
+#### 3.2.4 Literais Booleanos (`TRUE_LIT`, `FALSE_LIT`)
+
+| Literal | Valor interno |
+| ------- | ------------- |
+| `true`  | `1`           |
+| `false` | `0`           |
+
+### 3.3 Identificadores
+
+Um identificador começa com uma letra (`a-z`, `A-Z`) ou underscore (`_`), seguido de zero ou mais letras, dígitos ou underscores.
+
+**Regex:** `[a-zA-Z_][a-zA-Z0-9_]*`
+
+Exemplos válidos: `x`, `contagem`, `_temp`, `valor2`, `minha_var`
+
+> **Importante:** As palavras reservadas (`int`, `float`, `char`, `bool`, `true`, `false`) são reconhecidas **antes** da regra de identificador, portanto nunca podem ser usadas como nome de variável.
+
+### 3.4 Operadores e Pontuação
 
 #### Operadores Aritméticos
 
-| Símbolo | Token    | Descrição       |
-|---------|----------|-----------------|
-| `+`     | `PLUS`   | Adição          |
-| `-`     | `MINUS`  | Subtração       |
-| `*`     | `TIMES`  | Multiplicação   |
-| `/`     | `DIVIDE` | Divisão inteira |
+| Símbolo | Token    | Operação          |
+| ------- | -------- | ------------------ |
+| `+`     | `PLUS`   | Adição             |
+| `-`     | `MINUS`  | Subtração / Negação|
+| `*`     | `TIMES`  | Multiplicação      |
+| `/`     | `DIVIDE` | Divisão            |
 
 #### Operadores Relacionais
 
-| Símbolo | Token | Descrição       |
-|---------|-------|-----------------|
-| `<`     | `LT`  | Menor que       |
-| `>`     | `GT`  | Maior que       |
-| `<=`    | `LE`  | Menor ou igual  |
-| `>=`    | `GE`  | Maior ou igual  |
+| Símbolo | Token | Operação       |
+| ------- | ----- | -------------- |
+| `<`     | `LT`  | Menor que      |
+| `>`     | `GT`  | Maior que      |
+| `<=`    | `LE`  | Menor ou igual |
+| `>=`    | `GE`  | Maior ou igual |
 
 #### Operadores de Igualdade
 
-| Símbolo | Token | Descrição    |
-|---------|-------|--------------|
-| `==`    | `EQ`  | Igual a      |
-| `!=`    | `NE`  | Diferente de |
+| Símbolo | Token | Operação       |
+| ------- | ----- | -------------- |
+| `==`    | `EQ`  | Igual a        |
+| `!=`    | `NE`  | Diferente de   |
 
 #### Operadores Lógicos
 
-| Símbolo | Token | Descrição      | Aridade |
-|---------|-------|----------------|---------|
-| `&&`    | `AND` | E lógico       | Binário |
-| `\|\|`  | `OR`  | OU lógico      | Binário |
-| `!`     | `NOT` | Negação lógica | Unário  |
+| Símbolo | Token | Operação      |
+| ------- | ----- | ------------- |
+| `&&`    | `AND` | E lógico      |
+| `\|\|`  | `OR`  | Ou lógico     |
+| `!`     | `NOT` | Negação lógica|
 
-#### Outros Símbolos
+#### Pontuação
 
-| Símbolo | Token       | Descrição                  |
-|---------|-------------|----------------------------|
-| `=`     | `ASSIGN`    | Atribuição                 |
-| `;`     | `SEMICOLON` | Terminador de instrução    |
-| `(`     | `LPAREN`    | Parêntese esquerdo         |
-| `)`     | `RPAREN`    | Parêntese direito          |
+| Símbolo | Token       | Uso                            |
+| ------- | ----------- | ------------------------------ |
+| `=`     | `ASSIGN`    | Atribuição                     |
+| `;`     | `SEMICOLON` | Terminador de instrução        |
+| `(`     | `LPAREN`    | Abre agrupamento               |
+| `)`     | `RPAREN`    | Fecha agrupamento              |
 
-### 2.5 Caracteres Ignorados
+> **Nota:** O scanner reconhece `==` e `!=` **antes** de `=`, garantindo que a atribuição não seja confundida com igualdade.
 
-| Padrão        | Descrição                                     |
-|---------------|-----------------------------------------------|
-| `[ \t\n]+`    | Espaços, tabulações e quebras de linha         |
+### 3.5 Espaços em Branco e Comentários
 
-Qualquer outro caractere não reconhecido gera a mensagem:
-```
-Caractere não reconhecido: <char>
+- **Espaços, tabulações e quebras de linha** (`[ \t\n]+`) são **ignorados** silenciosamente.
+- **Comentários** não são suportados na implementação atual. Caracteres `//` ou `/* */` causarão erros léxicos.
+- Qualquer **caractere não reconhecido** gera a mensagem: `Caractere não reconhecido: <char>`.
+
+---
+
+## 4. Gramática Formal (BNF)
+
+```bnf
+<program>    ::= <line_list>
+
+<line_list>  ::= ε
+              |  <line_list> <line>
+
+<line>       ::= <stmt>
+
+<stmt>       ::= <expr> ";"
+              |  ID "=" <expr> ";"
+              |  <type_spec> ID ";"
+              |  <type_spec> ID "=" <expr> ";"
+
+<type_spec>  ::= "int" | "float" | "char" | "bool"
+
+<expr>       ::= <expr> "+" <expr>
+              |  <expr> "-" <expr>
+              |  <expr> "*" <expr>
+              |  <expr> "/" <expr>
+              |  "-" <expr>                    /* menos unário */
+              |  <expr> "&&" <expr>
+              |  <expr> "||" <expr>
+              |  "!" <expr>
+              |  <expr> "==" <expr>
+              |  <expr> "!=" <expr>
+              |  <expr> "<"  <expr>
+              |  <expr> ">"  <expr>
+              |  <expr> "<=" <expr>
+              |  <expr> ">=" <expr>
+              |  "(" <expr> ")"
+              |  NUM
+              |  FLOAT_LIT
+              |  CHAR_LIT
+              |  TRUE_LIT
+              |  FALSE_LIT
+              |  ID
 ```
 
 ---
 
-## 3. Gramática Formal (BNF)
+## 5. Sistema de Tipos
+
+### 5.1 Tipos Primitivos
+
+| Tipo    | `SymType`    | Tamanho interno | Faixa de valores           |
+| ------- | ------------ | --------------- | -------------------------- |
+| `int`   | `TYPE_INT`   | `int` (4 bytes) | −2³¹ a 2³¹−1              |
+| `float` | `TYPE_FLOAT` | `float` (4 bytes)| ±3.4×10³⁸ (aprox.)       |
+| `char`  | `TYPE_CHAR`  | `char` (1 byte) | −128 a 127 (signed)        |
+| `bool`  | `TYPE_BOOL`  | `int` (4 bytes) | `0` (false) ou `1` (true)  |
+
+Existe também `TYPE_NONE` na enumeração interna, indicando variável sem tipo explícito (comportamento legado), mas não é acessível pela gramática.
+
+### 5.2 Promoção e Conversão Implícita
+
+O sistema de tipos segue regras inspiradas no C padrão:
+
+#### Promoção em Operações Aritméticas
 
 ```
-<input>     ::= ε
-              | <input> <stmt>
-
-<stmt>      ::= <expr> ';'
-              | ID '=' <expr> ';'
-              | <type_spec> ID ';'
-              | <type_spec> ID '=' <expr> ';'
-
-<type_spec> ::= 'int'
-              | 'float'
-              | 'char'
-              | 'bool'
-
-<expr>      ::= <expr> '+' <expr>
-              | <expr> '-' <expr>
-              | <expr> '*' <expr>
-              | <expr> '/' <expr>
-              | <expr> '&&' <expr>
-              | <expr> '||' <expr>
-              | '!' <expr>
-              | <expr> '==' <expr>
-              | <expr> '!=' <expr>
-              | <expr> '<' <expr>
-              | <expr> '>' <expr>
-              | <expr> '<=' <expr>
-              | <expr> '>=' <expr>
-              | '(' <expr> ')'
-              | NUM
-              | 'true'
-              | 'false'
-              | ID
+Se qualquer operando é float → resultado é float (aritmética de ponto flutuante)
+Caso contrário              → resultado é int    (aritmética inteira)
 ```
+
+> **Atenção:** `char` e `bool` são **promovidos a `int`** em operações aritméticas. Isso significa que `'A' + 1` resulta em `int`, não `char`.
+
+#### Divisão Inteira
+
+Quando ambos os operandos são inteiros (incluindo `char` e `bool`):
+- `5 / 2` → `2` (truncamento para zero, como em C)
+- `5.0 / 2` → `2.5` (divisão de ponto flutuante por promoção)
+
+#### Conversão na Atribuição
+
+Ao atribuir um valor a uma variável, o valor é **convertido** para o tipo declarado da variável:
+
+| Tipo Destino | Conversão aplicada              | Exemplo                         |
+| ------------ | ------------------------------- | ------------------------------- |
+| `int`        | Trunca para inteiro             | `int j = 3.7;` → `j = 3`      |
+| `float`      | Converte para float             | `float f = 5;` → `f = 5`      |
+| `char`       | Trunca para inteiro, depois char | `char d = 65;` → `d = 'A'`   |
+| `bool`       | `0` → `false`, não-zero → `true`| `bool b = 42;` → `b = true`  |
+
+### 5.3 Armazenamento Interno (`SymValue`)
+
+Os valores são armazenados na tabela de símbolos usando uma **union discriminada**:
+
+```c
+typedef union {
+    int   iVal;   // TYPE_INT, TYPE_BOOL
+    float fVal;   // TYPE_FLOAT
+    char  cVal;   // TYPE_CHAR
+} SymValue;
+```
+
+O campo ativo é determinado pelo `SymType` da entrada. Internamente, todas as expressões são avaliadas usando `double` para uniformidade, e o valor é convertido para o tipo destino somente no momento da atribuição.
 
 ---
 
-## 4. Precedência e Associatividade de Operadores
+## 6. Declaração de Variáveis
 
-A tabela abaixo lista os operadores da **menor** para a **maior** precedência:
-
-| Nível | Operador(es)      | Associatividade | Descrição               |
-|-------|--------------------|-----------------|-------------------------|
-| 1     | `\|\|`             | Esquerda        | OU lógico               |
-| 2     | `&&`               | Esquerda        | E lógico                |
-| 3     | `==`  `!=`         | Esquerda        | Igualdade / Desigualdade|
-| 4     | `<`  `>`  `<=` `>=`| Esquerda        | Comparação relacional   |
-| 5     | `+`  `-`           | Esquerda        | Adição / Subtração      |
-| 6     | `*`  `/`           | Esquerda        | Multiplicação / Divisão |
-| 7     | `!`                | **Direita**     | Negação lógica (unário) |
-
-> [!TIP]
-> Parênteses `( )` podem ser usados para sobrescrever a precedência padrão em qualquer expressão.
-
-### Exemplos de resolução de precedência
+### Declaração sem inicialização
 
 ```c
-// Entrada:
-3 + 4 * 2;
-// Equivale a: 3 + (4 * 2) = 11   (* tem maior precedência que +)
-
-// Entrada:
-x > 5 && x < 10;
-// Equivale a: (x > 5) && (x < 10)   (&& tem menor precedência que > e <)
-
-// Entrada:
-!x || y && z;
-// Equivale a: (!x) || (y && z)   (! > && > ||)
-
-// Entrada:
-1 + 2 == 3;
-// Equivale a: (1 + 2) == 3 = 1   (+ tem maior precedência que ==)
+type id;
 ```
+
+A variável é criada com o valor padrão `0` (convertido para o tipo declarado).
+
+| Tipo    | Valor inicial |
+| ------- | ------------- |
+| `int`   | `0`           |
+| `float` | `0.0`         |
+| `char`  | `'\0'` (0)    |
+| `bool`  | `false` (0)   |
+
+**Exemplo:**
+```c
+int x;       // Declarado: x : int
+float pi;    // Declarado: pi : float
+```
+
+### Declaração com inicialização
+
+```c
+type id = expr;
+```
+
+A expressão é avaliada e convertida para o tipo declarado.
+
+**Exemplos:**
+```c
+int x = 42;           // Declarado: x : int = 42
+float pi = 3.14;      // Declarado: pi : float = 3.14
+char c = 'A';         // Declarado: c : char = 'A'
+bool flag = true;     // Declarado: flag : bool = true
+int j = 3.7;          // Declarado: j : int = 3  (truncado)
+char d = 65;          // Declarado: d : char = 'A' (código ASCII)
+```
+
+### Regras
+
+- **Declaração duplicada é proibida.** Declarar uma variável já existente causa erro fatal:
+  ```
+  Erro: variável 'x' já declarada
+  ```
+- **Variáveis devem ser declaradas antes do uso.** Usar uma variável não declarada causa erro:
+  ```
+  Erro: variável 'x' não declarada
+  ```
 
 ---
 
-## 5. Instruções (Statements)
-
-### 5.1 Expressão Simples
-
-```
-<expr> ;
-```
-
-Avalia a expressão e imprime o resultado.
+## 7. Atribuição
 
 ```c
-42;              // → Resultado: 42
-3 + 4 * 2;       // → Resultado: 11
-true;            // → Resultado: 1
-5 > 3;           // → Resultado: 1
+id = expr;
 ```
 
-### 5.2 Declaração de Variável (sem inicialização)
+Atribui o resultado da expressão à variável já declarada. O valor é **convertido implicitamente** para o tipo da variável.
 
-```
-<type_spec> ID ;
-```
-
-Declara uma variável com o tipo especificado e valor inicial `0`.
-
-```c
-int x;           // → Declarado: x : int
-bool flag;       // → Declarado: flag : bool
-float f;         // → Declarado: f : float
-char c;          // → Declarado: c : char
-```
-
-> [!CAUTION]
-> Tentar declarar uma variável que já existe resulta em erro fatal:
-> ```
-> Erro: variável 'x' já declarada
-> ```
-
-### 5.3 Declaração de Variável com Inicialização
-
-```
-<type_spec> ID = <expr> ;
-```
-
-Declara e inicializa a variável. Para variáveis do tipo `bool`, o valor é normalizado: qualquer valor diferente de zero se torna `1`.
-
-```c
-int x = 100;             // → Declarado: x : int = 100
-bool done = 0;           // → Declarado: done : bool = 0
-bool yes = 42;           // → Declarado: yes : bool = 1   (normalizado: !!42 = 1)
-int sum = 3 + 4;         // → Declarado: sum : int = 7
-bool cmp = 5 > 3;        // → Declarado: cmp : bool = 1
-```
-
-### 5.4 Atribuição
-
-```
-ID = <expr> ;
-```
-
-Atribui um novo valor a uma variável **já declarada**. Para variáveis `bool`, o valor é normalizado com `!!`.
-
+**Exemplos:**
 ```c
 int x = 10;
-x = 20;                  // → int x = 20
-bool flag = true;
-flag = 0;                // → bool flag = 0
-flag = 999;              // → bool flag = 1   (normalizado)
+x = 20;          // int x = 20
+x = 3.7;         // int x = 3 (truncado para int)
+
+float f = 1.0;
+f = 5;            // float f = 5 (promovido para float)
 ```
 
-> [!CAUTION]
-> Tentar atribuir a uma variável não declarada resulta em erro fatal:
-> ```
-> Erro: variável 'y' não declarada
-> ```
+### Regras
+
+- A variável **deve ter sido declarada previamente** com `type id;` ou `type id = expr;`.
+- Não é possível mudar o tipo de uma variável após a declaração.
+- O tipo da variável determina como o valor será armazenado, independentemente do tipo da expressão.
 
 ---
 
-## 6. Expressões
+## 8. Expressões
 
-### 6.1 Expressões Aritméticas
+Todas as expressões produzem um par `(valor, tipo)`. O tipo do resultado depende dos operandos e do operador utilizado.
 
-| Expressão    | Semântica        | Exemplo      | Resultado |
-|-------------|------------------|--------------|-----------|
-| `a + b`     | Adição           | `3 + 4`      | `7`       |
-| `a - b`     | Subtração        | `10 - 3`     | `7`       |
-| `a * b`     | Multiplicação    | `3 * 4`      | `12`      |
-| `a / b`     | Divisão inteira  | `7 / 2`      | `3`       |
+### 8.1 Operadores Aritméticos
 
-> [!CAUTION]
-> Divisão por zero causa erro fatal:
-> ```
-> Erro sintático: divisão por zero
-> ```
+| Operador | Sintaxe      | Tipo do Resultado                     |
+| -------- | ------------ | ------------------------------------- |
+| `+`      | `a + b`      | `float` se algum é float; senão `int` |
+| `-`      | `a - b`      | `float` se algum é float; senão `int` |
+| `*`      | `a * b`      | `float` se algum é float; senão `int` |
+| `/`      | `a / b`      | `float` se algum é float; senão `int` |
 
-### 6.2 Expressões Relacionais
+**Semântica de divisão:**
+- Divisão **inteira** quando ambos operandos são não-float: `7 / 2` → `3`
+- Divisão de **ponto flutuante** quando pelo menos um é float: `7.0 / 2` → `3.5`
+- **Divisão por zero** causa erro fatal: `Erro sintático: divisão por zero`
 
-| Expressão    | Semântica         | Exemplo      | Resultado |
-|-------------|-------------------|--------------|-----------|
-| `a < b`     | Menor que         | `3 < 5`      | `1`       |
-| `a > b`     | Maior que         | `3 > 5`      | `0`       |
-| `a <= b`    | Menor ou igual    | `5 <= 5`     | `1`       |
-| `a >= b`    | Maior ou igual    | `3 >= 5`     | `0`       |
+### 8.2 Operadores Relacionais
 
-### 6.3 Expressões de Igualdade
+| Operador | Sintaxe     | Descrição       | Tipo do Resultado |
+| -------- | ----------- | --------------- | ----------------- |
+| `<`      | `a < b`     | Menor que       | `int` (0 ou 1)    |
+| `>`      | `a > b`     | Maior que       | `int` (0 ou 1)    |
+| `<=`     | `a <= b`    | Menor ou igual  | `int` (0 ou 1)    |
+| `>=`     | `a >= b`    | Maior ou igual  | `int` (0 ou 1)    |
 
-| Expressão    | Semântica        | Exemplo      | Resultado |
-|-------------|------------------|--------------|-----------|
-| `a == b`    | Igualdade        | `5 == 5`     | `1`       |
-| `a != b`    | Desigualdade     | `5 != 3`     | `1`       |
+A comparação é realizada em `double`, permitindo comparações mistas entre tipos.
 
-### 6.4 Expressões Lógicas
+### 8.3 Operadores de Igualdade
 
-| Expressão    | Semântica           | Exemplo             | Resultado |
-|-------------|---------------------|----------------------|-----------|
-| `a && b`    | E lógico            | `1 && 0`             | `0`       |
-| `a \|\| b`  | OU lógico           | `0 \|\| 1`           | `1`       |
-| `!a`        | Negação (unário)    | `!0`                 | `1`       |
+| Operador | Sintaxe     | Descrição     | Tipo do Resultado |
+| -------- | ----------- | ------------- | ----------------- |
+| `==`     | `a == b`    | Igual a       | `int` (0 ou 1)    |
+| `!=`     | `a != b`    | Diferente de  | `int` (0 ou 1)    |
 
-> [!NOTE]
-> Os operadores lógicos operam com semântica C: qualquer valor diferente de zero é "verdadeiro". **Não há avaliação em curto-circuito** (short-circuit evaluation) — ambos os operandos são sempre avaliados.
+**Exemplo:** `'a' == 97;` → `Resultado: 1` (pois `'a'` = 97 em ASCII)
 
-### 6.5 Agrupamento
+### 8.4 Operadores Lógicos
+
+| Operador | Sintaxe     | Descrição        | Tipo do Resultado |
+| -------- | ----------- | ---------------- | ----------------- |
+| `&&`     | `a && b`    | E lógico (AND)   | `int` (0 ou 1)    |
+| `\|\|`   | `a \|\| b`  | Ou lógico (OR)   | `int` (0 ou 1)    |
+| `!`      | `!a`        | Negação (NOT)    | `int` (0 ou 1)    |
+
+- Operandos são avaliados como **truthy/falsy**: zero é falso, qualquer não-zero é verdadeiro.
+- O resultado é sempre `int` com valor `0` ou `1`.
+
+> **Nota:** Os operadores lógicos **não** fazem avaliação de curto-circuito (*short-circuit*) — ambos os operandos são sempre avaliados.
+
+### 8.5 Menos Unário
+
+```c
+-expr
+```
+
+Nega o valor da expressão. O tipo do resultado é o mesmo da expressão.
+
+**Exemplos:**
+```c
+-42;      // Resultado: -42         (int)
+-3.14;    // Resultado: -3.14       (float)
+```
+
+### 8.6 Agrupamento com Parênteses
 
 ```c
 (expr)
 ```
-Parênteses alteram a ordem de avaliação:
+
+Parênteses podem ser usados para alterar a ordem de avaliação.
+
+**Exemplo:**
 ```c
-(3 + 4) * 2;     // → Resultado: 14   (sem parênteses seria 11)
+(2 + 3) * 4;    // Resultado: 20
+2 + 3 * 4;      // Resultado: 14
 ```
 
-### 6.6 Referência a Variável
+---
 
-Usar um `ID` em uma expressão recupera o valor armazenado na tabela de símbolos:
+## 9. Precedência e Associatividade
 
-```c
-int x = 10;
-int y = 20;
-x + y;            // → Resultado: 30
-x > y;            // → Resultado: 0
-```
+Da **menor** para a **maior** precedência:
 
-> [!CAUTION]
-> Usar uma variável não declarada em uma expressão causa erro fatal:
+| Nível | Operador(es)      | Associatividade | Descrição             |
+| ----- | ----------------- | --------------- | --------------------- |
+| 1     | `\|\|`            | Esquerda        | Ou lógico             |
+| 2     | `&&`              | Esquerda        | E lógico              |
+| 3     | `==` `!=`         | Esquerda        | Igualdade             |
+| 4     | `<` `>` `<=` `>=` | Esquerda        | Relacional            |
+| 5     | `+` `-`           | Esquerda        | Adição / Subtração    |
+| 6     | `*` `/`           | Esquerda        | Multiplicação / Divisão |
+| 7     | `!` `-` (unário)  | **Direita**     | Negação / Menos unário |
+
+> **Exemplo de precedência:**
+> ```c
+> !a && b || c > 3 + 1 * 2
 > ```
-> Erro: variável 'z' não declarada
+> É interpretado como:
+> ```c
+> ((!a) && b) || (c > (3 + (1 * 2)))
 > ```
 
 ---
 
-## 7. Sistema de Tipos
+## 10. Tabela de Símbolos
 
-### 7.1 Tipos Disponíveis
+A tabela de símbolos utiliza uma **hash table com encadeamento externo** (separate chaining).
 
-| Tipo    | Enum Interno  | Descrição             | Armazenamento |
-|---------|---------------|----------------------|---------------|
-| `int`   | `TYPE_INT`    | Inteiro              | `int` (C)     |
-| `float` | `TYPE_FLOAT`  | Ponto flutuante      | `int` (C) *   |
-| `char`  | `TYPE_CHAR`   | Caractere            | `int` (C) *   |
-| `bool`  | `TYPE_BOOL`   | Booleano             | `int` (C) **  |
-| (nenhum)| `TYPE_NONE`   | Sem tipo (legado)    | `int` (C)     |
+### Especificações
 
-> \* `float` e `char` são reconhecidos sintaticamente e armazenados na tabela de símbolos com seu tipo, mas o valor é internamente um `int`. Não há conversão de tipo real.
+| Propriedade            | Valor                                  |
+| ---------------------- | -------------------------------------- |
+| Tamanho                | 211 buckets (número primo)             |
+| Algoritmo de hash      | djb2 (Dan Bernstein)                   |
+| Resolução de colisões  | Listas encadeadas                      |
+| Inserção               | O(1) — início da lista                 |
+| Busca                  | O(n) no pior caso por bucket           |
 
-> \*\* Valores `bool` são **normalizados**: na declaração com inicialização e na atribuição, aplica-se `!!valor`, garantindo que o resultado seja `0` ou `1`.
+### Estrutura de uma Entrada
 
-### 7.2 Regras de Normalização Booleana
+```c
+typedef struct SymEntry {
+    char       *name;    // nome da variável (cópia via strdup)
+    SymType     type;    // tipo declarado (TYPE_INT, TYPE_FLOAT, etc.)
+    SymValue    value;   // valor armazenado (union discriminada)
+    struct SymEntry *next;  // próximo no bucket (ou NULL)
+} SymEntry;
+```
 
-Quando o tipo da variável destino é `bool`:
+### Funções Disponíveis
 
-| Valor de Entrada | Valor Armazenado |
-|-------------------|-------------------|
-| `0`               | `0`               |
-| `1`               | `1`               |
-| `42`              | `1`               |
-| `-1`              | `1`               |
-| `true`            | `1`               |
-| `false`           | `0`               |
+| Função            | Descrição                                              |
+| ----------------- | ------------------------------------------------------ |
+| `sym_lookup(name)` | Busca variável; retorna `SymEntry*` ou `NULL`         |
+| `sym_set(name, type, value)` | Insere ou atualiza variável              |
+| `sym_type_name(type)` | Retorna string legível do tipo (`"int"`, `"float"`, etc.) |
+| `sym_print()`     | Imprime toda a tabela (depuração)                      |
+| `sym_free()`      | Libera toda a memória alocada                          |
 
----
+### Saída ao Final do Programa
 
-## 8. Tabela de Símbolos
-
-### 8.1 Estrutura
-
-- **Implementação**: Hash table com encadeamento externo (211 buckets, número primo)
-- **Algoritmo de hash**: djb2 (Dan Bernstein)
-- **Cada entrada contém**: nome (`char*`), tipo (`SymType`), valor (`int`), ponteiro para próximo
-
-### 8.2 Operações
-
-| Função             | Descrição                                               |
-|--------------------|---------------------------------------------------------|
-| `sym_lookup(name)` | Busca variável; retorna `SymEntry*` ou `NULL`           |
-| `sym_set(name, type, value)` | Insere ou atualiza variável                  |
-| `sym_type_name(type)` | Retorna nome legível do tipo (`"int"`, `"bool"`, ...) |
-| `sym_print()`      | Imprime toda a tabela (depuração)                       |
-| `sym_free()`       | Libera toda memória alocada                             |
-
-### 8.3 Comportamento ao Final da Execução
-
-Ao terminar o `yyparse()`, a tabela de símbolos é impressa automaticamente:
+Ao terminar a execução, a tabela de símbolos é automaticamente impressa:
 
 ```
 --- Tabela de Símbolos ---
-  x : int = 100
-  flag : bool = 1
+  x : float = 3.14
+  c : char = 'A' (65)
+  flag : bool = true
+  i : int = 10
 --------------------------
 ```
 
 ---
 
-## 9. Tratamento de Erros
+## 11. Tratamento de Erros
 
-### 9.1 Erros Léxicos
+O compilador detecta os seguintes erros em tempo de execução:
 
-| Situação                        | Mensagem                                |
-|----------------------------------|-----------------------------------------|
-| Caractere não reconhecido        | `Caractere não reconhecido: <char>`     |
+### Erros Semânticos (Fatais — abortam a execução)
 
-Caracteres não reconhecidos são reportados mas **não interrompem** a análise; o lexer simplesmente os ignora e continua.
+| Erro                                         | Mensagem                                        |
+| -------------------------------------------- | ----------------------------------------------- |
+| Uso de variável não declarada                | `Erro: variável 'x' não declarada`              |
+| Declaração duplicada de variável             | `Erro: variável 'x' já declarada`               |
+| Divisão por zero                             | `Erro sintático: divisão por zero`               |
 
-### 9.2 Erros Semânticos (interrompem a execução com `YYABORT`)
+### Erros Léxicos (Não fatais)
 
-| Situação                                | Mensagem                                  |
-|------------------------------------------|--------------------------------------------|
-| Variável não declarada (em expressão)    | `Erro: variável '<nome>' não declarada`    |
-| Variável não declarada (em atribuição)   | `Erro: variável '<nome>' não declarada`    |
-| Variável já declarada (redeclaração)     | `Erro: variável '<nome>' já declarada`     |
-| Divisão por zero                         | `Erro sintático: divisão por zero`         |
+| Erro                                         | Mensagem                                        |
+| -------------------------------------------- | ----------------------------------------------- |
+| Caractere não reconhecido                    | `Caractere não reconhecido: <char>`              |
+| Sequência de escape inválida em char literal | `Sequência de escape inválida: <seq>`            |
 
-### 9.3 Erros Sintáticos
+### Erros Sintáticos (Fatais)
 
-Erros de sintaxe são capturados pelo Bison com a mensagem padrão:
-```
-Erro sintático: syntax error
-```
+| Erro                                         | Mensagem                                        |
+| -------------------------------------------- | ----------------------------------------------- |
+| Token inesperado / estrutura inválida        | `Erro sintático: syntax error`                   |
 
-> [!NOTE]
-> Não há mecanismo de **recuperação de erros** (`error` token). Qualquer erro semântico ou sintático **aborta** a execução imediatamente.
+> Todos os erros fatais (semânticos e sintáticos) causam **`YYABORT`**, encerrando a execução do parser.
 
 ---
 
-## 10. Exemplos Completos
+## 12. Sequências de Escape
 
-### 10.1 Programa com Aritmética e Variáveis
+As seguintes sequências de escape são reconhecidas dentro de literais de caractere:
+
+| Sequência | Caractere             | Código ASCII |
+| --------- | --------------------- | ------------ |
+| `\a`      | Alerta (bell)         | 7            |
+| `\b`      | Backspace             | 8            |
+| `\f`      | Form feed             | 12           |
+| `\n`      | Nova linha (newline)  | 10           |
+| `\r`      | Retorno de carro      | 13           |
+| `\t`      | Tabulação horizontal  | 9            |
+| `\v`      | Tabulação vertical    | 11           |
+| `\\`      | Barra invertida       | 92           |
+| `\'`      | Aspas simples         | 39           |
+| `\"`      | Aspas duplas          | 34           |
+| `\?`      | Interrogação          | 63           |
+| `\0`      | Caractere nulo        | 0            |
+
+> Sequências de escape não listadas acima geram um aviso e usam o caractere literal após a barra.
+
+---
+
+## 13. Exemplos Completos
+
+### Exemplo 1 — Tipos e operações básicas
 
 ```c
 int x = 10;
-int y = 20;
+float y = 3.14;
 x + y;
-x * y - 5;
-(x + y) / 3;
+5 / 2;
+5.0 / 2;
 ```
 
 **Saída esperada:**
 ```
 Declarado: x : int = 10
-Declarado: y : int = 20
-Resultado: 30
-Resultado: 195
-Resultado: 10
-```
-
-### 10.2 Programa com Booleanos e Lógica
-
-```c
-bool a = true;
-bool b = false;
-a && b;
-a || b;
-!b;
-int x = 42;
-x > 10 && x < 100;
-```
-
-**Saída esperada:**
-```
-Declarado: a : bool = 1
-Declarado: b : bool = 0
-Resultado: 0
-Resultado: 1
-Resultado: 1
-Declarado: x : int = 42
-Resultado: 1
-```
-
-### 10.3 Programa com Reatribuição
-
-```c
-int count = 0;
-count = count + 1;
-count = count + 1;
-count;
-```
-
-**Saída esperada:**
-```
-Declarado: count : int = 0
-int count = 1
-int count = 2
+Declarado: y : float = 3.14
+Resultado: 13.14
 Resultado: 2
+Resultado: 2.5
 ```
 
-### 10.4 Programa com Comparações Compostas
+### Exemplo 2 — Caracteres e ASCII
 
 ```c
-int a = 5;
-int b = 10;
-a == b;
-a != b;
-a < b;
-a >= b;
-a + 5 == b;
-(a == 5) && (b == 10);
+char c = 'A';
+c;
+c + 1;
+char d = 65;
+'a' == 97;
 ```
 
 **Saída esperada:**
 ```
-Declarado: a : int = 5
-Declarado: b : int = 10
+Declarado: c : char = 'A'
+Resultado: 'A'
+Resultado: 66
+Declarado: d : char = 'A'
+Resultado: 1
+```
+
+### Exemplo 3 — Booleanos e lógica
+
+```c
+bool flag = true;
+bool other = false;
+flag && other;
+flag || other;
+!flag;
+```
+
+**Saída esperada:**
+```
+Declarado: flag : bool = true
+Declarado: other : bool = false
 Resultado: 0
 Resultado: 1
-Resultado: 1
 Resultado: 0
-Resultado: 1
+```
+
+### Exemplo 4 — Conversão implícita na atribuição
+
+```c
+int j = 3.7;
+char d = 65;
+float f = 5;
+bool b = 42;
+```
+
+**Saída esperada:**
+```
+Declarado: j : int = 3
+Declarado: d : char = 'A'
+Declarado: f : float = 5
+Declarado: b : bool = true
+```
+
+### Exemplo 5 — Sequências de escape
+
+```c
+char newline = '\n';
+char tab = '\t';
+char backslash = '\\';
+char quote = '\'';
+```
+
+**Saída esperada:**
+```
+Declarado: newline : char = 10
+Declarado: tab : char = 9
+Declarado: backslash : char = '\' (92)
+Declarado: quote : char = ''' (39)
+```
+
+### Exemplo 6 — Expressões mistas com variáveis
+
+```c
+float x = 3.14;
+int i = 10;
+i + x;
+bool b = true;
+b && (x > 2.0);
+```
+
+**Saída esperada:**
+```
+Declarado: x : float = 3.14
+Declarado: i : int = 10
+Resultado: 13.14
+Declarado: b : bool = true
 Resultado: 1
 ```
 
 ---
 
-## 11. Limitações Conhecidas
+## 14. Limitações Conhecidas
 
-| Limitação                              | Detalhes                                                    |
-|----------------------------------------|-------------------------------------------------------------|
-| Sem suporte a ponto flutuante real     | `float` é apenas um rótulo de tipo; valores são `int`       |
-| Sem literais negativos                 | Não existe operador unário `-`; use `0 - n`                 |
-| Sem strings                            | Literais de string (`"..."`) não são reconhecidos            |
-| Sem estruturas de controle             | `if`, `else`, `while`, `for`, `switch` não implementados    |
-| Sem funções                            | Não há declaração/chamada de funções                        |
-| Sem arrays                             | Não há suporte a arrays ou ponteiros                         |
-| Sem escopo                             | Todas as variáveis são globais                               |
-| Sem short-circuit                      | `&&` e `||` sempre avaliam ambos operandos                  |
-| Sem recuperação de erro                | Qualquer erro aborta o programa                              |
-| Sem literais `char`                    | `'a'` não é reconhecido como literal de caractere            |
-| Sem coerção de tipos                   | Não há conversão implícita/explícita entre tipos             |
-| Sem comentários                        | `//` e `/* */` não são reconhecidos na entrada               |
-| `NUM` apenas inteiros positivos        | Padrão `[0-9]+` reconhece somente inteiros sem sinal        |
-
----
-
-## 12. Referência Rápida — Cheat Sheet
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ TIPOS:   int   float   char   bool                              │
-│ LITERAIS: 42 (NUM)   true   false                               │
-│                                                                 │
-│ DECLARAÇÃO:                                                     │
-│   int x;              → declara sem inicializar (valor = 0)     │
-│   int x = 42;         → declara e inicializa                    │
-│   bool b = true;      → declara booleano                        │
-│                                                                 │
-│ ATRIBUIÇÃO:                                                     │
-│   x = expr;           → variável deve estar declarada           │
-│                                                                 │
-│ EXPRESSÃO:                                                      │
-│   expr;               → avalia e imprime o resultado            │
-│                                                                 │
-│ OPERADORES (menor → maior precedência):                         │
-│   ||  →  &&  →  == !=  →  < > <= >=  →  + -  →  * /  →  !     │
-│                                                                 │
-│ AGRUPAMENTO: ( expr )                                           │
-│                                                                 │
-│ TERMINADOR: toda instrução termina com ;                        │
-└─────────────────────────────────────────────────────────────────┘
-```
+| Limitação | Descrição |
+| --------- | --------- |
+| Sem controle de fluxo | Não há `if`, `else`, `while`, `for`, `switch` |
+| Sem funções | Não há declaração ou chamada de funções |
+| Sem arrays/ponteiros | Não há suporte a arrays, strings ou ponteiros |
+| Sem strings | Não há tipo string nem literais `"..."` |
+| Sem comentários | `//` e `/* */` não são reconhecidos |
+| Sem escopo | Todas as variáveis são globais |
+| Sem notação científica | `1e10`, `3.14e-2` não são reconhecidos |
+| Sem literais octais/hex | `0xFF`, `077` não são reconhecidos |
+| Sem operadores bit-a-bit | `&`, `|`, `^`, `~`, `<<`, `>>` não existem |
+| Sem operadores compostos | `+=`, `-=`, `*=`, `/=` não existem |
+| Sem incremento/decremento | `++`, `--` não existem |
+| Sem operador ternário | `? :` não existe |
+| Sem `sizeof` | O operador `sizeof` não é suportado |
+| Sem `typedef` | Definição de tipos personalizados não é suportada |
+| Sem `struct`/`union`/`enum` | Tipos compostos não são suportados |
+| Sem pré-processador | `#include`, `#define`, `#ifdef` etc. não são reconhecidos |
+| Sem curto-circuito | `&&` e `||` avaliam sempre ambos os operandos |
+| Sem declaração múltipla | `int a, b;` não é suportado |
+| Sem cast explícito | `(int)3.14` não é suportado |
