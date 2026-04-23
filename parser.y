@@ -15,17 +15,69 @@ Descrição: Exemplo de gramática para expressão aritmética
 /* Declarações para evitar avisos de função implícita */
 int yylex(void);
 void yyerror(const char *s);
-%}
 
-/* Define valor semântico (intValue) */
-%union {
-    int intValue;
-    char *strValue;
+/* Imprime um valor formatado de acordo com o tipo */
+static void print_value(int type, double val) {
+    switch ((SymType)type) {
+        case TYPE_FLOAT: printf("%g", val); break;
+        case TYPE_CHAR: {
+            char c = (char)(int)val;
+            if (c >= 32 && c < 127)
+                printf("'%c'", c);
+            else
+                printf("%d", (int)c);
+            break;
+        }
+        case TYPE_BOOL:  printf("%s", ((int)val) ? "true" : "false"); break;
+        default:         printf("%d", (int)val); break;
+    }
 }
 
-/* Token que carrega valor semântico */
-%token <intValue> NUM
-%token <strValue> ID
+/* Promoção de tipo C-standard: float domina; char/bool promovem a int */
+static int promote_type(int a, int b) {
+    if (a == TYPE_FLOAT || b == TYPE_FLOAT) return TYPE_FLOAT;
+    return TYPE_INT;
+}
+
+/* Converte valor double para SymValue de acordo com o tipo destino */
+static SymValue to_sym_value(SymType type, double val) {
+    SymValue v;
+    switch (type) {
+        case TYPE_FLOAT: v.fVal = (float)val; break;
+        case TYPE_CHAR:  v.cVal = (char)(int)val; break;
+        case TYPE_BOOL:  v.iVal = !!((int)val); break;
+        default:         v.iVal = (int)val; break;
+    }
+    return v;
+}
+
+/* Extrai valor double de SymEntry */
+static double sym_val_as_double(const SymEntry *e) {
+    switch (e->type) {
+        case TYPE_FLOAT: return (double)e->value.fVal;
+        case TYPE_CHAR:  return (double)e->value.cVal;
+        default:         return (double)e->value.iVal;
+    }
+}
+%}
+
+/* Define valor semântico */
+%union {
+    int    intValue;    /* NUM, literais booleanos, type_spec */
+    double floatValue;  /* FLOAT_LIT */
+    char   charValue;   /* CHAR_LIT */
+    char  *strValue;    /* identificadores */
+    struct {
+        double val;     /* valor numérico (double para uniformidade) */
+        int    type;    /* SymType do resultado */
+    } exprVal;          /* expressões tipadas */
+}
+
+/* Tokens que carregam valor semântico */
+%token <intValue>   NUM
+%token <floatValue> FLOAT_LIT
+%token <charValue>  CHAR_LIT
+%token <strValue>   ID
 
 /* Literais booleanos (carregam intValue: 1 para true, 0 para false) */
 %token <intValue> TRUE_LIT FALSE_LIT
@@ -41,70 +93,83 @@ void yyerror(const char *s);
 
 /* Declara precedência (menor → maior):
    - OR  tem menor precedência
-   - NOT tem maior precedência (unário) */
+   - NOT/UMINUS tem maior precedência (unários) */
 %left OR
 %left AND
 %left EQ NE
 %left LT GT LE GE
 %left PLUS MINUS
 %left TIMES DIVIDE
-%right NOT
+%right NOT UMINUS
 
 /* Associa não terminais aos tipos da %union */
-%type <intValue> expr
+%type <exprVal>  expr
 %type <intValue> type_spec
 
 %%
 
-input:
-      %empty
-    | input stmt
+program:
+      line_list
     ;
+
+line_list:
+      %empty
+    | line_list line
+    ;
+
+line:
+      stmt
+    ;
+
 stmt:
-      expr SEMICOLON             { printf("Resultado: %d\n", $1); }
+      expr SEMICOLON             {
+                                    printf("Resultado: ");
+                                    print_value($1.type, $1.val);
+                                    printf("\n");
+                                 }
     | ID ASSIGN expr SEMICOLON   {
-                                /* Atribuição: exige que a variável já tenha sido declarada */
-                                SymEntry *e = sym_lookup($1);
-                                if (!e) {
-                                    fprintf(stderr, "Erro: variável '%s' não declarada\n", $1);
+                                    /* Atribuição: exige que a variável já tenha sido declarada */
+                                    SymEntry *e = sym_lookup($1);
+                                    if (!e) {
+                                        fprintf(stderr, "Erro: variável '%s' não declarada\n", $1);
+                                        free($1);
+                                        YYABORT;
+                                    }
+                                    /* Converte o valor para o tipo da variável */
+                                    e->value = to_sym_value(e->type, $3.val);
+                                    printf("%s %s = ", sym_type_name(e->type), $1);
+                                    print_value(e->type, sym_val_as_double(e));
+                                    printf("\n");
                                     free($1);
-                                    YYABORT;
-                                }
-                                /* Normaliza valor para bool (C-style) */
-                                if (e->type == TYPE_BOOL) {
-                                    e->value = !!$3;
-                                } else {
-                                    e->value = $3;
-                                }
-                                printf("%s %s = %d\n", sym_type_name(e->type), $1, e->value);
-                                free($1);
-                            }
-    | type_spec ID SEMICOLON {
-                                /* Declaração de variável sem inicialização */
-                                SymEntry *e = sym_lookup($2);
-                                if (e) {
-                                    fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
+                                 }
+    | type_spec ID SEMICOLON     {
+                                    /* Declaração de variável sem inicialização */
+                                    SymEntry *e = sym_lookup($2);
+                                    if (e) {
+                                        fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
+                                        free($2);
+                                        YYABORT;
+                                    }
+                                    SymValue v = to_sym_value((SymType)$1, 0.0);
+                                    sym_set($2, (SymType)$1, v);
+                                    printf("Declarado: %s : %s\n", $2, sym_type_name((SymType)$1));
                                     free($2);
-                                    YYABORT;
-                                }
-                                sym_set($2, (SymType)$1, 0);
-                                printf("Declarado: %s : %s\n", $2, sym_type_name((SymType)$1));
-                                free($2);
-                            }
+                                 }
     | type_spec ID ASSIGN expr SEMICOLON {
-                                /* Declaração de variável com inicialização */
-                                SymEntry *e = sym_lookup($2);
-                                if (e) {
-                                    fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
+                                    /* Declaração de variável com inicialização */
+                                    SymEntry *e = sym_lookup($2);
+                                    if (e) {
+                                        fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
+                                        free($2);
+                                        YYABORT;
+                                    }
+                                    SymValue v = to_sym_value((SymType)$1, $4.val);
+                                    sym_set($2, (SymType)$1, v);
+                                    printf("Declarado: %s : %s = ", $2, sym_type_name((SymType)$1));
+                                    print_value($1, sym_val_as_double(sym_lookup($2)));
+                                    printf("\n");
                                     free($2);
-                                    YYABORT;
-                                }
-                                /* Normaliza valor para bool (C-style) */
-                                int val = ($1 == TYPE_BOOL) ? !!$4 : $4;
-                                sym_set($2, (SymType)$1, val);
-                                printf("Declarado: %s : %s = %d\n", $2, sym_type_name((SymType)$1), val);
-                                free($2);
-                            }
+                                 }
     ;
 
 type_spec:
@@ -115,29 +180,65 @@ type_spec:
     ;
 
 expr:
-      expr PLUS expr    { $$ = $1 + $3; }
-    | expr MINUS expr   { $$ = $1 - $3; }
-    | expr TIMES expr   { $$ = $1 * $3; }
+    /* Operadores aritméticos (aritmética inteira quando ambos não-float) */
+      expr PLUS expr    {
+                            $$.type = promote_type($1.type, $3.type);
+                            if ($$.type == TYPE_FLOAT)
+                                $$.val = $1.val + $3.val;
+                            else
+                                $$.val = (double)((int)$1.val + (int)$3.val);
+                        }
+    | expr MINUS expr   {
+                            $$.type = promote_type($1.type, $3.type);
+                            if ($$.type == TYPE_FLOAT)
+                                $$.val = $1.val - $3.val;
+                            else
+                                $$.val = (double)((int)$1.val - (int)$3.val);
+                        }
+    | expr TIMES expr   {
+                            $$.type = promote_type($1.type, $3.type);
+                            if ($$.type == TYPE_FLOAT)
+                                $$.val = $1.val * $3.val;
+                            else
+                                $$.val = (double)((int)$1.val * (int)$3.val);
+                        }
     | expr DIVIDE expr  {
-                            if ($3 == 0) {
+                            if ($3.val == 0.0) {
                                 yyerror("divisão por zero");
                                 YYABORT;
                             }
-                            $$ = $1 / $3;
+                            $$.type = promote_type($1.type, $3.type);
+                            if ($$.type == TYPE_FLOAT)
+                                $$.val = $1.val / $3.val;
+                            else
+                                $$.val = (double)((int)$1.val / (int)$3.val);
                         }
-    | expr AND expr     { $$ = $1 && $3; }
-    | expr OR expr      { $$ = $1 || $3; }
-    | NOT expr          { $$ = !$2; }
-    | expr EQ expr      { $$ = ($1 == $3); }
-    | expr NE expr      { $$ = ($1 != $3); }
-    | expr LT expr      { $$ = ($1 < $3); }
-    | expr GT expr      { $$ = ($1 > $3); }
-    | expr LE expr      { $$ = ($1 <= $3); }
-    | expr GE expr      { $$ = ($1 >= $3); }
+    /* Menos unário */
+    | MINUS expr %prec UMINUS {
+                            $$.val = -$2.val;
+                            $$.type = $2.type;
+                        }
+    /* Operadores lógicos (resultado sempre int 0 ou 1) */
+    | expr AND expr     { $$.val = (double)($1.val && $3.val); $$.type = TYPE_INT; }
+    | expr OR expr      { $$.val = (double)($1.val || $3.val); $$.type = TYPE_INT; }
+    | NOT expr          { $$.val = (double)(!$2.val); $$.type = TYPE_INT; }
+    /* Operadores de igualdade */
+    | expr EQ expr      { $$.val = (double)($1.val == $3.val); $$.type = TYPE_INT; }
+    | expr NE expr      { $$.val = (double)($1.val != $3.val); $$.type = TYPE_INT; }
+    /* Operadores relacionais */
+    | expr LT expr      { $$.val = (double)($1.val < $3.val); $$.type = TYPE_INT; }
+    | expr GT expr      { $$.val = (double)($1.val > $3.val); $$.type = TYPE_INT; }
+    | expr LE expr      { $$.val = (double)($1.val <= $3.val); $$.type = TYPE_INT; }
+    | expr GE expr      { $$.val = (double)($1.val >= $3.val); $$.type = TYPE_INT; }
+    /* Agrupamento */
     | LPAREN expr RPAREN{ $$ = $2; }
-    | NUM               { $$ = $1; }
-    | TRUE_LIT          { $$ = $1; }
-    | FALSE_LIT         { $$ = $1; }
+    /* Literais */
+    | NUM               { $$.val = (double)$1; $$.type = TYPE_INT; }
+    | FLOAT_LIT         { $$.val = $1; $$.type = TYPE_FLOAT; }
+    | CHAR_LIT          { $$.val = (double)$1; $$.type = TYPE_CHAR; }
+    | TRUE_LIT          { $$.val = (double)$1; $$.type = TYPE_BOOL; }
+    | FALSE_LIT         { $$.val = (double)$1; $$.type = TYPE_BOOL; }
+    /* Variáveis */
     | ID                {
                             SymEntry *e = sym_lookup($1);
                             if (!e) {
@@ -145,9 +246,10 @@ expr:
                                 free($1);
                                 YYABORT;
                             }
-                            $$ = e->value;
+                            $$.val = sym_val_as_double(e);
+                            $$.type = e->type;
                             free($1);
-                          }
+                        }
     ;
 
 %%
