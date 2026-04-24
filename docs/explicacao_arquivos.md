@@ -184,3 +184,63 @@ SymEntry *sym_lookup(const char *name) {
 * **Funções de Impressão e Liberação de Memória:** 
   * `sym_print`: Percorre todos os buckets da Hash Table apenas para imprimir uma lista formatada no terminal (útil para debugar).
   * `sym_free`: Como os elementos são gerados usando `malloc`, isso varre todos os arrays apagando recursivamente com o método `free()` o nó alocado e a cópia da string alocada por `strdup()`, evitando Memory Leaks.
+
+---
+
+## 7. `ast.h` e `ast.c`
+**Propósito:** Definem a **Árvore Sintática Abstrata (AST)**. Essa estrutura permite a separação entre a etapa de análise sintática (parsing) e a etapa de execução (avaliação). O parser constrói a árvore e, após sua conclusão, o compilador a percorre para executar o programa.
+
+### Estrutura do Nó da Árvore (`ast.h`)
+O cabeçalho define um enumerador (`NodeType`) para os tipos de nós suportados, como comandos condicionais (`IF`), laços de repetição (`WHILE`), literais e operações binárias. A `struct ASTNode` implementa uma `union` para otimização de memória, armazenando os dados específicos estritamente necessários de acordo com o tipo de nó atual:
+```c
+typedef enum {
+    AST_NUM, AST_ID, AST_BINOP, AST_IF, AST_WHILE, AST_FOR // ...
+} NodeType;
+
+typedef struct ASTNode {
+    NodeType kind;              /* tipo do nó                 */
+    struct ASTNode *next;       /* encadeamento para listas de comandos */
+
+    union {
+        /* AST_BINOP: left OP right */
+        struct {
+            int op;
+            struct ASTNode *left;
+            struct ASTNode *right;
+        } binop;
+        
+        /* Outros tipos como while, for, block... */
+    } data;
+} ASTNode;
+```
+
+### O Avaliador da Árvore (`eval_ast` em `ast.c`)
+A execução do programa é realizada através da função `eval_ast`. Essa função recursiva avalia a árvore nó por nó executando a ação correspondente ao `NodeType`. No exemplo de um laço de repetição `AST_WHILE`, a função avalia a condição do nó filho e executa a ramificação do corpo recursivamente enquanto a condição for verdadeira:
+```c
+    case AST_WHILE: {
+        while (1) {
+            EvalResult cond = eval_ast(node->data.while_stmt.cond);
+            if (cond.val == 0.0) break;
+            exec_list(node->data.while_stmt.body); // Executa o corpo do laço
+        }
+        break;
+    }
+```
+
+### Limpeza de Memória (`free_ast` em `ast.c`)
+Como os nós da árvore são instanciados dinamicamente com `calloc()`, a função `free_ast` é responsável por liberar adequadamente toda a estrutura alocada. O método utiliza uma abordagem recursiva post-order (de baixo para cima), liberando os nós filhos antes de liberar o nó pai, prevenindo vazamentos de memória (memory leaks).
+```c
+void free_ast(ASTNode *node) {
+    if (!node) return;
+    free_ast(node->next); // Libera a lista encadeada
+
+    switch (node->kind) {
+    case AST_BINOP:
+        free_ast(node->data.binop.left);
+        free_ast(node->data.binop.right);
+        break;
+    // ...
+    }
+    free(node);
+}
+```
