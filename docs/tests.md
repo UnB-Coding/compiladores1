@@ -1,88 +1,177 @@
 # Testes
 
-## Como funciona
-
-Os testes utilizam **pytest** para verificar o comportamento do lexer de forma automatizada. A arquitetura tem três camadas:
+## Estrutura
 
 ```
 tests/
-├── conftest.py          # fixtures de build e execução
-├── lexer_test_main.c    # driver C com main() para o binário de teste
-└── test_lexer.py        # casos de teste organizados por categoria
+├── conftest.py           # build automático e fixtures
+├── lexer_test_main.c     # driver C do lexer standalone
+├── scanner_test_main.c   # driver C do scanner (tokens Bison)
+├── test_lexer.py         # testes do lexer/lexer.l
+├── test_scanner.py       # testes do scanner.l
+└── test_parser.py        # testes do parser.y + ast.c
 ```
-
-### Fluxo de build (automático ao rodar os testes)
-
-1. O `conftest.py` verifica se `build/lexer.yy.c` já existe; se não existir, invoca o `flex` para gerá-lo a partir de `lexer/lexer.l`.
-2. Em seguida compila `build/lexer.yy.c` + `tests/lexer_test_main.c` com `gcc` (sem `-lfl`, porque `lexer_test_main.c` fornece o próprio `main`), gerando o binário `build/lexer_test_exe`.
-3. O `gcc` e o `flex` são localizados via `PATH` ou, no Windows, nos caminhos conhecidos do MSYS2 (`/c/msys64/usr/bin` e `/c/msys64/ucrt64/bin`).
-
-Esse build acontece uma única vez por sessão de testes (`scope="session"`), antes de qualquer caso de teste ser executado.
-
-### Fixture `lex`
-
-A fixture `lex` exposta pelo `conftest.py` retorna uma função auxiliar `run(source: str) -> list[dict]` que:
-
-1. Passa a string `source` via **stdin** para `build/lexer_test_exe`.
-2. Lê a saída linha a linha, extraindo as linhas com prefixo `TOKEN`.
-3. Devolve uma lista de dicionários `{"type": ..., "value": ...}`.
-
-Formato de saída do binário:
-
-```
-TOKEN KW_INT int
-TOKEN IDENTIFIER x
-TOKEN OP_ASSIGN =
-TOKEN LIT_INT 42
-TOKEN SEMICOLON ;
-```
-
-### Categorias de teste (`test_lexer.py`)
-
-| Classe | O que testa |
-|---|---|
-| `TestKeywords` | Palavras-chave de tipo (`int`, `float`, `char`, ...) |
-| `TestControlFlowKeywords` | Palavras-chave de controle (`if`, `while`, `return`, ...) |
-| `TestIdentifiers` | Identificadores simples, com `_`, mistos e com dígitos |
-| `TestLiterals` | Literais inteiros, float, string e char |
-| `TestOperators` | Aritméticos, relacionais, lógicos e atribuição |
-| `TestDelimiters` | Chaves, parênteses, colchetes, `;` e `,` |
-| `TestWhitespaceAndComments` | Espaços, tabs, quebras de linha e comentários `//` e `/* */` |
-| `TestRealisticInput` | Trechos reais de código C (declaração, `if`, função, `return`) |
 
 ---
 
-## Dependências
-
-- Python 3.x
-- pytest >= 7.0 (declarado em `requirements-test.txt`)
-- gcc e flex instalados (via MSYS2 no Windows)
-
-Instalar o pytest:
+## Instalação
 
 ```bash
 pip install -r requirements-test.txt
 ```
+
+Dependências de sistema: `gcc`, `flex`, `bison`.
+
+- **Linux:** `sudo apt install gcc flex bison`
+- **Windows:** MSYS2 com `pacman -S mingw-w64-ucrt-x86_64-gcc flex bison`
 
 ---
 
 ## Como rodar
 
 ```bash
-# Todos os testes
+# Todos os testes (com relatório de cobertura)
 python -m pytest
 
-# Com saída detalhada (nome de cada teste)
+# Saída detalhada por teste
 python -m pytest -v
 
-# Apenas uma categoria
-python -m pytest -v -k TestKeywords
-
-# Apenas um teste específico
-python -m pytest -v tests/test_lexer.py::TestLiterals::test_float_literal
+# Filtrar por suíte ou categoria
+python -m pytest tests/test_parser.py
+python -m pytest -k TestDeclarations
 
 # Parar no primeiro erro
 python -m pytest -x
 ```
 
-> O `pytest.ini` já aponta `testpaths = tests`, então não é necessário indicar o caminho da pasta.
+O `pytest.ini` define `testpaths = tests`, então não é necessário passar o caminho.
+
+---
+
+## Relatório de cobertura
+
+Ao rodar `python -m pytest`, o terminal exibe automaticamente:
+
+```
+Name                    Stmts   Miss  Cover   Missing
+-----------------------------------------------------
+tests\conftest.py          99     19    81%   39-47, 57-63 ...
+tests\test_lexer.py       175      0   100%
+tests\test_parser.py      171      0   100%
+tests\test_scanner.py     205      0   100%
+-----------------------------------------------------
+TOTAL                     650     19    97%
+```
+
+- **`Stmts`** — linhas executáveis
+- **`Miss`** — linhas não executadas por nenhum teste
+- **`Missing`** — números das linhas não cobertas
+
+O relatório HTML completo é gerado em `build/coverage_html/index.html`.
+
+> O `conftest.py` tem 81% porque as linhas faltantes são blocos de tratamento de erro dos builds (ex: `raise RuntimeError` quando `flex` falha). Esses caminhos só executam em ambientes quebrados — não vale testá-los.
+
+> A cobertura mede apenas o código **Python** (`conftest.py` e arquivos `test_*.py`). O código C (`ast.c`, `scanner.l`, `parser.y`) roda como processo externo via `subprocess` e não é medido aqui.
+
+---
+
+## Fixtures
+
+O `conftest.py` compila os binários automaticamente antes dos testes, sem precisar rodar `make`.
+
+| Fixture | Binário | Tokens |
+|---|---|---|
+| `lex` | `build/lexer_test_exe` | `KW_INT`, `IDENTIFIER`, `OP_PLUS` |
+| `scan` | `build/scanner_test_exe` | `T_INT`, `ID`, `PLUS` |
+| `parse` | `build/parser_exe` | recebe código C, retorna `stdout`/`stderr`/`returncode` |
+
+### `lex` e `scan`
+
+Ambas recebem uma string de código e retornam uma lista de dicionários `{"type": ..., "value": ...}`:
+
+```python
+tokens = lex("int x = 42;")
+# [{"type": "KW_INT", "value": "int"}, {"type": "IDENTIFIER", "value": "x"}, ...]
+
+tokens = scan("int x = 42;")
+# [{"type": "T_INT", "value": "int"}, {"type": "ID", "value": "x"}, ...]
+```
+
+### `parse`
+
+Executa o parser completo com o código recebido via stdin:
+
+```python
+r = parse("int x = 5; x + 1;")
+r["returncode"]  # 0 = sem erro de compilação
+r["stdout"]      # "Declarado: x : int = 5\nResultado: 6\n..."
+r["stderr"]      # mensagens de erro sintático/semântico
+```
+
+Formato do stdout:
+
+| Comando C | Saída |
+|---|---|
+| `int x = 5;` | `Declarado: x : int = 5` |
+| `int x;` | `Declarado: x : int` |
+| `x = 10;` | `int x = 10` |
+| `3 + 4;` | `Resultado: 7` |
+| fim do programa | `--- Tabela de Símbolos ---` |
+
+> `parser.y` sempre termina com `exit 0`, mesmo em erro sintático. Para verificar erros, cheque `r["stderr"]`.
+
+---
+
+## Casos de teste
+
+### `test_lexer.py` — `lexer/lexer.l`
+
+| Classe | Cobre |
+|---|---|
+| `TestKeywords` | `int`, `float`, `char`, `long`, `double`, `short`, `signed`, `unsigned` |
+| `TestControlFlowKeywords` | `if`, `else`, `while`, `for`, `do`, `switch`, `case`, `break`, `continue`, `return` |
+| `TestIdentifiers` | simples, `_prefixo`, camelCase, com dígitos, não começa com dígito |
+| `TestLiterals` | inteiro, float, notação científica, string, char |
+| `TestOperators` | aritméticos, relacionais, lógicos, atribuição |
+| `TestDelimiters` | `{}`, `()`, `[]`, `;`, `,` |
+| `TestWhitespaceAndComments` | espaços, tabs, `\n`, comentários `//` e `/* */` |
+| `TestRealisticInput` | trechos reais de código C |
+
+### `test_scanner.py` — `scanner.l`
+
+| Classe | Cobre |
+|---|---|
+| `TestTypeKeywords` | `T_INT`, `T_FLOAT`, `T_CHAR`, `T_BOOL` |
+| `TestControlFlowKeywords` | `KW_IF/ELSE/WHILE/FOR`; prefixo de keyword vira `ID` |
+| `TestBoolLiterals` | `TRUE_LIT`, `FALSE_LIT`; `truex` → `ID` |
+| `TestIdentifiers` | simples, underscore, camelCase, com dígitos |
+| `TestNumericLiterals` | `NUM`, `FLOAT_LIT`; float reconhecido antes de inteiro |
+| `TestCharLiterals` | `'a'`, `'\n'`, `'\t'`, `'\\'` |
+| `TestArithmeticOperators` | `PLUS`, `MINUS`, `TIMES`, `DIVIDE` |
+| `TestRelationalOperators` | `EQ/NE/LE/GE/LT/GT`; `=` não confunde com `==` |
+| `TestLogicalOperators` | `AND`, `OR`, `NOT`; `!` não confunde com `!=` |
+| `TestAssignAndDelimiters` | `ASSIGN`, `SEMICOLON`, `LPAREN/RPAREN`, `LBRACE/RBRACE` |
+| `TestWhitespace` | espaços, tabs, newlines ignorados; entrada vazia |
+| `TestRealisticSequences` | declaração, `if`, `while`, `for`, bloco, bool |
+
+### `test_parser.py` — `parser.y` + `ast.c`
+
+| Classe | Cobre |
+|---|---|
+| `TestSyntaxValidity` | programas válidos (exit 0); erros sintáticos no stderr |
+| `TestDeclarations` | `int`, `float`, `char`, `bool` com e sem init; redeclaração falha |
+| `TestAssignments` | saída `tipo nome = valor`; variável não declarada falha |
+| `TestExpressionStatements` | aritmética, divisão inteira vs float, precedência, lógica |
+| `TestControlFlow` | `if`/`else`, `while`, `for` iterando, blocos `{}` |
+| `TestSymbolTable` | tabela presente, `(vazia)` sem variáveis, valor final correto |
+
+---
+
+## Makefile
+
+```bash
+make        # compila parser_exe e lexer_exe
+make clean  # remove artefatos de build
+```
+
+Os testes **não dependem do `make`** — o `conftest.py` compila tudo automaticamente.
