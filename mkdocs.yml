@@ -28,9 +28,12 @@ theme:
 
 nav:
   - Início: index.md
-  - Componentes:
+  - Compilador:
+    - Como Executar: como_executar.md
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md
+    - Guia Gramática: guia_gramatica.md
+    - Testes: tests.md
   - Contribuição: contributing.md
 
 markdown_extensions:
