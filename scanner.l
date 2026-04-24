@@ -3,8 +3,12 @@ FGA0003 - Compiladores 1
 Curso de Engenharia de Software
 Universidade de Brasília (UnB)
 
-Arquivo: lexer.l
-Descrição: Exemplo de analisador léxico (tokens aritméticos)
+Arquivo: scanner.l
+Descrição: Analisador léxico (Flex) para o compilador
+
+Retorna tokens para literais, operadores, palavras-chave
+de tipo, controle de fluxo (if/else/while/for) e
+delimitadores de bloco.
 ******************************************************/
 
 %{
@@ -89,6 +93,8 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
  /* Palavras-chave de controle de fluxo (antes de identificadores) */
 "if"        { return KW_IF; }
 "else"      { return KW_ELSE; }
+"while"     { return KW_WHILE; }
+"for"       { return KW_FOR; }
 
  /* Literais booleanos (antes da regra de identificador) */
 "true"      { yylval.intValue = 1; return TRUE_LIT; }
