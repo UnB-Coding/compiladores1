@@ -86,9 +86,17 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
 "char"      { return T_CHAR; }
 "bool"      { return T_BOOL; }
 
+ /* Palavras-chave de controle de fluxo (antes de identificadores) */
+"if"        { return KW_IF; }
+"else"      { return KW_ELSE; }
+
  /* Literais booleanos (antes da regra de identificador) */
 "true"      { yylval.intValue = 1; return TRUE_LIT; }
 "false"     { yylval.intValue = 0; return FALSE_LIT; }
+
+ /* Delimitadores de bloco */
+"{"         { return LBRACE; }
+"}"         { return RBRACE; }
 
 [a-zA-Z_][a-zA-Z0-9_]*  {
     yylval.strValue = strdup(yytext);

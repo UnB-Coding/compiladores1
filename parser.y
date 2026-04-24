@@ -16,6 +16,24 @@ Descrição: Exemplo de gramática para expressão aritmética
 int yylex(void);
 void yyerror(const char *s);
 
+/* Estado de execução para if/else: g_exec=0 suprime ações de stmt */
+#define MAX_IF_DEPTH 64
+static int g_exec             = 1;
+static int g_exec_stack[MAX_IF_DEPTH];
+static int g_exec_depth       = 0;
+
+static void push_exec(int cond) {
+    g_exec_stack[g_exec_depth++] = g_exec;
+    g_exec = g_exec && (cond != 0);
+}
+static void flip_exec(void) {
+    int parent = g_exec_stack[g_exec_depth - 1];
+    if (parent) g_exec = !g_exec;
+}
+static void pop_exec(void) {
+    g_exec = g_exec_stack[--g_exec_depth];
+}
+
 /* Imprime um valor formatado de acordo com o tipo */
 static void print_value(int type, double val) {
     switch ((SymType)type) {
@@ -88,6 +106,9 @@ static double sym_val_as_double(const SymEntry *e) {
 /* Tokens para palavras-chave de tipo */
 %token T_INT T_FLOAT T_CHAR T_BOOL
 
+/* Tokens para controle de fluxo e blocos */
+%token KW_IF KW_ELSE LBRACE RBRACE
+
 /* Operadores relacionais, de igualdade e lógicos */
 %token AND OR NOT EQ NE LT GT LE GE
 
@@ -106,6 +127,9 @@ static double sym_val_as_double(const SymEntry *e) {
 %type <exprVal>  expr
 %type <intValue> type_spec
 
+/* Conflito shift/reduce do dangling-else: resolvido por shift (semântica C) */
+%expect 1
+
 %%
 
 program:
@@ -123,53 +147,65 @@ line:
 
 stmt:
       expr SEMICOLON             {
-                                    printf("Resultado: ");
-                                    print_value($1.type, $1.val);
-                                    printf("\n");
+                                    if (g_exec) {
+                                        printf("Resultado: ");
+                                        print_value($1.type, $1.val);
+                                        printf("\n");
+                                    }
                                  }
     | ID ASSIGN expr SEMICOLON   {
-                                    /* Atribuição: exige que a variável já tenha sido declarada */
-                                    SymEntry *e = sym_lookup($1);
-                                    if (!e) {
-                                        fprintf(stderr, "Erro: variável '%s' não declarada\n", $1);
-                                        free($1);
-                                        YYABORT;
+                                    if (g_exec) {
+                                        SymEntry *e = sym_lookup($1);
+                                        if (!e) {
+                                            fprintf(stderr, "Erro: variável '%s' não declarada\n", $1);
+                                            free($1);
+                                            YYABORT;
+                                        }
+                                        e->value = to_sym_value(e->type, $3.val);
+                                        printf("%s %s = ", sym_type_name(e->type), $1);
+                                        print_value(e->type, sym_val_as_double(e));
+                                        printf("\n");
                                     }
-                                    /* Converte o valor para o tipo da variável */
-                                    e->value = to_sym_value(e->type, $3.val);
-                                    printf("%s %s = ", sym_type_name(e->type), $1);
-                                    print_value(e->type, sym_val_as_double(e));
-                                    printf("\n");
                                     free($1);
                                  }
     | type_spec ID SEMICOLON     {
-                                    /* Declaração de variável sem inicialização */
-                                    SymEntry *e = sym_lookup($2);
-                                    if (e) {
-                                        fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
-                                        free($2);
-                                        YYABORT;
+                                    if (g_exec) {
+                                        SymEntry *e = sym_lookup($2);
+                                        if (e) {
+                                            fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
+                                            free($2);
+                                            YYABORT;
+                                        }
+                                        SymValue v = to_sym_value((SymType)$1, 0.0);
+                                        sym_set($2, (SymType)$1, v);
+                                        printf("Declarado: %s : %s\n", $2, sym_type_name((SymType)$1));
                                     }
-                                    SymValue v = to_sym_value((SymType)$1, 0.0);
-                                    sym_set($2, (SymType)$1, v);
-                                    printf("Declarado: %s : %s\n", $2, sym_type_name((SymType)$1));
                                     free($2);
                                  }
     | type_spec ID ASSIGN expr SEMICOLON {
-                                    /* Declaração de variável com inicialização */
-                                    SymEntry *e = sym_lookup($2);
-                                    if (e) {
-                                        fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
-                                        free($2);
-                                        YYABORT;
+                                    if (g_exec) {
+                                        SymEntry *e = sym_lookup($2);
+                                        if (e) {
+                                            fprintf(stderr, "Erro: variável '%s' já declarada\n", $2);
+                                            free($2);
+                                            YYABORT;
+                                        }
+                                        SymValue v = to_sym_value((SymType)$1, $4.val);
+                                        sym_set($2, (SymType)$1, v);
+                                        printf("Declarado: %s : %s = ", $2, sym_type_name((SymType)$1));
+                                        print_value($1, sym_val_as_double(sym_lookup($2)));
+                                        printf("\n");
                                     }
-                                    SymValue v = to_sym_value((SymType)$1, $4.val);
-                                    sym_set($2, (SymType)$1, v);
-                                    printf("Declarado: %s : %s = ", $2, sym_type_name((SymType)$1));
-                                    print_value($1, sym_val_as_double(sym_lookup($2)));
-                                    printf("\n");
                                     free($2);
                                  }
+    | if_cond stmt               { pop_exec(); }
+    | if_cond stmt KW_ELSE       { flip_exec(); }
+      stmt                       { pop_exec(); }
+    | LBRACE line_list RBRACE
+    ;
+
+if_cond:
+      KW_IF LPAREN expr RPAREN   { push_exec($3.val != 0.0); }
     ;
 
 type_spec:
@@ -242,12 +278,18 @@ expr:
     | ID                {
                             SymEntry *e = sym_lookup($1);
                             if (!e) {
-                                fprintf(stderr, "Erro: variável '%s' não declarada\n", $1);
-                                free($1);
-                                YYABORT;
+                                if (!g_exec) {
+                                    $$.val = 0.0;
+                                    $$.type = TYPE_INT;
+                                } else {
+                                    fprintf(stderr, "Erro: variável '%s' não declarada\n", $1);
+                                    free($1);
+                                    YYABORT;
+                                }
+                            } else {
+                                $$.val = sym_val_as_double(e);
+                                $$.type = e->type;
                             }
-                            $$.val = sym_val_as_double(e);
-                            $$.type = e->type;
                             free($1);
                         }
     ;
