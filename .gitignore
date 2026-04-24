@@ -3,7 +3,7 @@ build/*
 !build/.gitkeep
 .venv/*
 _pycache__/
-
+.vscode/
 # Prerequisites
 *.d
 

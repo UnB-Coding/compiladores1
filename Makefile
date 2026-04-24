@@ -27,7 +27,12 @@ FLEX_FLAGS  =      # deixe vazio ou acrescente opções, se necessário
 # Parâmetros de compilação
 CC      = gcc
 CFLAGS  = -I. -Isymbol_table
-LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
+
+# parser_exe: parser.y fornece main() e scanner.l fornece yywrap() → sem -lfl
+LDFLAGS =
+
+# lexer_exe: lexer.l não define main() → depende de -lfl para fornecê-la
+LEXER_LDFLAGS = -lfl
 
 # Regra padrão: compila ambos os executáveis
 all: $(EXEC) $(LEXER_EXEC)
@@ -40,7 +45,7 @@ $(BUILD_DIR):
 # Lexer standalone (subconjunto C)
 # ========================================================
 $(LEXER_EXEC): $(LEXER_C) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(LEXER_C) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(LEXER_C) $(LEXER_LDFLAGS)
 
 $(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
 	flex $(FLEX_FLAGS) -o $(LEXER_C) $(LEXER_FILE)
