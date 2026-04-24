@@ -32,6 +32,7 @@ nav:
     - Como Executar: como_executar.md
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md
+    - Explicação dos Arquivos: explicacao_arquivos.md
     - Guia Gramática: guia_gramatica.md
     - Testes: tests.md
   - Contribuição: contributing.md
