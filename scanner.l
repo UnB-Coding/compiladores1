@@ -16,9 +16,44 @@ Descrição: Exemplo de analisador léxico (tokens aritméticos)
 
 %%
 
+ /* Literais de ponto flutuante (antes de inteiros para maximal munch) */
+[0-9]+\.[0-9]*|\.[0-9]+  {
+    yylval.floatValue = atof(yytext);
+    return FLOAT_LIT;
+}
+
 [0-9]+  {
     yylval.intValue = atoi(yytext);
     return NUM;
+}
+
+ /* Literais de caractere: caractere simples entre aspas simples */
+'[^\\']'  {
+    yylval.charValue = yytext[1];
+    return CHAR_LIT;
+}
+
+ /* Literais de caractere: sequências de escape padrão C */
+'\\.'     {
+    switch (yytext[2]) {
+        case 'a':  yylval.charValue = '\a'; break;
+        case 'b':  yylval.charValue = '\b'; break;
+        case 'f':  yylval.charValue = '\f'; break;
+        case 'n':  yylval.charValue = '\n'; break;
+        case 'r':  yylval.charValue = '\r'; break;
+        case 't':  yylval.charValue = '\t'; break;
+        case 'v':  yylval.charValue = '\v'; break;
+        case '\\': yylval.charValue = '\\'; break;
+        case '\'': yylval.charValue = '\''; break;
+        case '"':  yylval.charValue = '"';  break;
+        case '?':  yylval.charValue = '?';  break;
+        case '0':  yylval.charValue = '\0'; break;
+        default:
+            fprintf(stderr, "Sequência de escape inválida: %s\n", yytext);
+            yylval.charValue = yytext[2];
+            break;
+    }
+    return CHAR_LIT;
 }
 
 "+"     { return PLUS; }

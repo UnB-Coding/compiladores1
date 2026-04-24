@@ -44,14 +44,27 @@ typedef enum {
 } SymType;
 
 /*
+ * Valor armazenado na tabela de símbolos.
+ * O campo ativo depende do tipo declarado da variável:
+ *   TYPE_INT, TYPE_BOOL → iVal
+ *   TYPE_FLOAT          → fVal
+ *   TYPE_CHAR           → cVal
+ */
+typedef union {
+    int   iVal;   /* TYPE_INT, TYPE_BOOL */
+    float fVal;   /* TYPE_FLOAT */
+    char  cVal;   /* TYPE_CHAR */
+} SymValue;
+
+/*
  * Estrutura de uma entrada na tabela de símbolos.
  * Cada entrada pertence a uma lista encadeada dentro
  * de um bucket da tabela hash.
  */
 typedef struct SymEntry {
-    char    *name;  /* nome da variável (alocado dinamicamente) */
-    SymType  type;  /* tipo declarado da variável */
-    int      value; /* valor inteiro associado à variável */
+    char       *name;   /* nome da variável (alocado dinamicamente) */
+    SymType     type;   /* tipo declarado da variável */
+    SymValue    value;  /* valor associado à variável */
     struct SymEntry *next;  /* próxima entrada no mesmo bucket (ou NULL) */
 } SymEntry;
 
@@ -76,7 +89,7 @@ SymEntry *sym_lookup(const char *name);
  * Parâmetros:
  *   name  - nome da variável.
  *   type  - tipo declarado (TYPE_NONE para legado).
- *   value - valor inteiro a ser atribuído.
+ *   value - valor (SymValue) a ser atribuído.
  *
  * Retorno:
  *   Ponteiro para a entrada inserida ou atualizada.
@@ -84,7 +97,7 @@ SymEntry *sym_lookup(const char *name);
  * Nota: encerra o programa com EXIT_FAILURE em caso
  *       de falha na alocação de memória.
  */
-SymEntry *sym_set(const char *name, SymType type, int value);
+SymEntry *sym_set(const char *name, SymType type, SymValue value);
 
 /*
  * Retorna o nome legível do tipo ("int", "float", etc.).

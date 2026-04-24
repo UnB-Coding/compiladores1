@@ -80,7 +80,7 @@ SymEntry *sym_lookup(const char *name) {
  *
  * Encerra o programa se malloc() falhar.
  */
-SymEntry *sym_set(const char *name, SymType type, int value) {
+SymEntry *sym_set(const char *name, SymType type, SymValue value) {
     /* Verifica se o símbolo já existe na tabela */
     SymEntry *e = sym_lookup(name);
     if (e) {
@@ -115,7 +115,27 @@ void sym_print(void) {
     for (int i = 0; i < SYMTAB_SIZE; i++) {
         SymEntry *e = table[i];
         while (e) {
-            printf("  %s : %s = %d\n", e->name, sym_type_name(e->type), e->value);
+            printf("  %s : %s = ", e->name, sym_type_name(e->type));
+            switch (e->type) {
+                case TYPE_FLOAT:
+                    printf("%g", e->value.fVal);
+                    break;
+                case TYPE_CHAR: {
+                    char c = e->value.cVal;
+                    if (c >= 32 && c < 127)
+                        printf("'%c' (%d)", c, (int)c);
+                    else
+                        printf("%d", (int)c);
+                    break;
+                }
+                case TYPE_BOOL:
+                    printf("%s", e->value.iVal ? "true" : "false");
+                    break;
+                default:
+                    printf("%d", e->value.iVal);
+                    break;
+            }
+            printf("\n");
             count++;
             e = e->next;
         }
