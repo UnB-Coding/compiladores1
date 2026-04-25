@@ -262,6 +262,38 @@ class TestExecutionErrors:
         assert r["returncode"] != 0
         assert "não declarada" in r["stderr"].lower()
 
+# ---------------------------------------------------------------------------
+# Promoção e Coerção de Tipos
+# ---------------------------------------------------------------------------
+
+
+class TestTypeCoercion:
+    def test_int_mais_float_promocao(self, parse):
+        r = parse("1 + 2.5;")
+        assert "Resultado: 3.5" in r["stdout"]
+        assert r["returncode"] == 0
+
+    def test_char_mais_int_promocao(self, parse):
+        r = parse("'A' + 1;")
+        # 'A' é 65, 65 + 1 = 66
+        assert "Resultado: 66" in r["stdout"]
+        assert r["returncode"] == 0
+
+    def test_bool_em_aritmetica(self, parse):
+        r = parse("true + 5;")
+        # true é 1, 1 + 5 = 6
+        assert "Resultado: 6" in r["stdout"]
+        assert r["returncode"] == 0
+
+    def test_atribuicao_float_para_int(self, parse):
+        r = parse("int x = 3.14;")
+        # Na tabela deve truncar
+        assert "Declarado: x : int = 3" in r["stdout"]
+
+    def test_atribuicao_int_para_float(self, parse):
+        r = parse("float f = 42;")
+        assert "f : float = 42" in r["stdout"]
+
 
 # ---------------------------------------------------------------------------
 # Tabela de símbolos
