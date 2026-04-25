@@ -36,6 +36,8 @@ nav:
     - Guia Gramática: guia_gramatica.md
     - Testes: tests.md
   - Contribuição: contributing.md
+  - Relatórios:
+    - Sprint 1: sprint1.md
 
 markdown_extensions:
   - admonition
