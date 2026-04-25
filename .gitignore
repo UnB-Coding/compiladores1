@@ -59,3 +59,9 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+.coverage
+__pycache__/
+*.py[cod]
+*$py.class
+.coverage
