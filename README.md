@@ -123,3 +123,26 @@ hotfix/corrige-crash-entrada-vazia
 release/1.0.0
 docs/atualiza-convencoes
 ```
+
+### Testes
+
+#### Como funciona 
+
+O conftest.py compila build/lexer.yy.c + tests/lexer_test_main.c com gcc sem -lfl, porque o driver fornece o próprio main. A fixture lex passa código C pela stdin do binário e parseia a saída:
+
+TOKEN KW_INT int
+TOKEN IDENTIFIER x
+TOKEN OP_ASSIGN =
+TOKEN LIT_INT 42
+TOKEN SEMICOLON ;
+
+#### Para rodar
+
+# Instalar pytest (já feito)
+pip install pytest
+
+# Rodar todos os testes
+python -m pytest
+
+# Rodar com saída detalhada
+python -m pytest -v

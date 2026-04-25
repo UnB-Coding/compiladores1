@@ -2,7 +2,8 @@
 build/*
 !build/.gitkeep
 .venv/*
-
+_pycache__/
+.vscode/
 # Prerequisites
 *.d
 
@@ -58,3 +59,9 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+.coverage
+__pycache__/
+*.py[cod]
+*$py.class
+.coverage
