@@ -455,6 +455,151 @@ EvalResult eval_ast(ASTNode *node) {
 }
 
 /* ====================================================
+ * Impressão visual da AST (para demonstração)
+ *
+ * Percorre a árvore recursivamente, imprimindo cada nó
+ * com indentação proporcional ao nível de profundidade.
+ * Ao final de cada nó, percorre a lista encadeada (->next).
+ * ==================================================== */
+
+/* Converte o código interno do operador para string legível */
+static const char *op_to_str(int op) {
+    switch (op) {
+        case '+': return "+";
+        case '-': return "-";
+        case '*': return "*";
+        case '/': return "/";
+        case '&': return "&&";
+        case '|': return "||";
+        case '!': return "!";
+        case 'E': return "==";
+        case 'N': return "!=";
+        case '<': return "<";
+        case '>': return ">";
+        case 'l': return "<=";
+        case 'g': return ">=";
+        default:  return "?";
+    }
+}
+
+void print_ast(ASTNode *node, int level) {
+    if (!node) return;
+
+    /* Indentação: 2 espaços por nível */
+    for (int i = 0; i < level; i++) printf("  ");
+
+    switch (node->kind) {
+
+    case AST_NUM:
+        printf("NUM (%d)\n", node->data.num.value);
+        break;
+
+    case AST_FLOAT:
+        printf("FLOAT (%g)\n", node->data.flt.value);
+        break;
+
+    case AST_CHAR:
+        printf("CHAR ('%c')\n", node->data.chr.value);
+        break;
+
+    case AST_BOOL:
+        printf("BOOL (%s)\n", node->data.bln.value ? "true" : "false");
+        break;
+
+    case AST_ID:
+        printf("ID (%s)\n", node->data.id.name);
+        break;
+
+    case AST_BINOP:
+        printf("BINOP (%s)\n", op_to_str(node->data.binop.op));
+        print_ast(node->data.binop.left,  level + 1);
+        print_ast(node->data.binop.right, level + 1);
+        break;
+
+    case AST_UNARYOP:
+        printf("UNARYOP (%s)\n", op_to_str(node->data.unaryop.op));
+        print_ast(node->data.unaryop.operand, level + 1);
+        break;
+
+    case AST_ASSIGN:
+        printf("ASSIGN (%s)\n", node->data.assign.name);
+        print_ast(node->data.assign.expr, level + 1);
+        break;
+
+    case AST_DECL:
+        printf("DECL (%s : %s)\n",
+               node->data.decl.name,
+               sym_type_name(node->data.decl.type));
+        if (node->data.decl.init) {
+            for (int i = 0; i < level + 1; i++) printf("  ");
+            printf("init:\n");
+            print_ast(node->data.decl.init, level + 2);
+        }
+        break;
+
+    case AST_EXPR_STMT:
+        printf("EXPR_STMT\n");
+        print_ast(node->data.expr_stmt.expr, level + 1);
+        break;
+
+    case AST_IF:
+        printf("IF\n");
+        for (int i = 0; i < level + 1; i++) printf("  ");
+        printf("cond:\n");
+        print_ast(node->data.if_stmt.cond, level + 2);
+        for (int i = 0; i < level + 1; i++) printf("  ");
+        printf("then:\n");
+        print_ast(node->data.if_stmt.then_branch, level + 2);
+        if (node->data.if_stmt.else_branch) {
+            for (int i = 0; i < level + 1; i++) printf("  ");
+            printf("else:\n");
+            print_ast(node->data.if_stmt.else_branch, level + 2);
+        }
+        break;
+
+    case AST_WHILE:
+        printf("WHILE\n");
+        for (int i = 0; i < level + 1; i++) printf("  ");
+        printf("cond:\n");
+        print_ast(node->data.while_stmt.cond, level + 2);
+        for (int i = 0; i < level + 1; i++) printf("  ");
+        printf("body:\n");
+        print_ast(node->data.while_stmt.body, level + 2);
+        break;
+
+    case AST_FOR:
+        printf("FOR\n");
+        if (node->data.for_stmt.init) {
+            for (int i = 0; i < level + 1; i++) printf("  ");
+            printf("init:\n");
+            print_ast(node->data.for_stmt.init, level + 2);
+        }
+        if (node->data.for_stmt.cond) {
+            for (int i = 0; i < level + 1; i++) printf("  ");
+            printf("cond:\n");
+            print_ast(node->data.for_stmt.cond, level + 2);
+        }
+        if (node->data.for_stmt.step) {
+            for (int i = 0; i < level + 1; i++) printf("  ");
+            printf("step:\n");
+            print_ast(node->data.for_stmt.step, level + 2);
+        }
+        for (int i = 0; i < level + 1; i++) printf("  ");
+        printf("body:\n");
+        print_ast(node->data.for_stmt.body, level + 2);
+        break;
+
+    case AST_BLOCK:
+        printf("BLOCK\n");
+        print_ast(node->data.block.stmts, level + 1);
+        break;
+    }
+
+    /* Percorre a lista encadeada (próximo comando no mesmo nível) */
+    print_ast(node->next, level);
+}
+
+/* ====================================================
  * free_ast: libera recursivamente toda a memória da AST
  * ==================================================== */
 void free_ast(ASTNode *node) {

@@ -178,6 +178,11 @@ ASTNode *new_block_node(ASTNode *stmts);
 EvalResult eval_ast(ASTNode *node);
 
 /* ====================================================
+ * Impressão visual: exibe a AST com indentação
+ * ==================================================== */
+void print_ast(ASTNode *node, int level);
+
+/* ====================================================
  * Liberação de memória: percorre a árvore recursivamente
  * ==================================================== */
 void free_ast(ASTNode *node);

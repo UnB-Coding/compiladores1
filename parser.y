@@ -18,6 +18,9 @@ em eval_ast().
 #include "ast.h"
 #include "symbol_table/symtab.h"
 
+/* Variável global do Flex: define o arquivo de entrada do scanner */
+extern FILE *yyin;
+
 /* Declarações para evitar avisos de função implícita */
 int yylex(void);
 void yyerror(const char *s);
@@ -228,10 +231,25 @@ expr:
 /* ====================================================
  * main: parsing → execução → limpeza
  * ==================================================== */
-int main(void) {
+int main(int argc, char **argv) {
+    /* Se um arquivo foi passado como argumento, usa-o como entrada */
+    if (argc > 1) {
+        FILE *f = fopen(argv[1], "r");
+        if (!f) {
+            fprintf(stderr, "Erro: não foi possível abrir '%s'\n", argv[1]);
+            return EXIT_FAILURE;
+        }
+        yyin = f;
+    }
+
     if (yyparse() == 0 && ast_root) {
         /* Fase 1 concluída: AST construída com sucesso.
-         * Fase 2: percorrer a AST e executar o programa. */
+         * Imprime a árvore para demonstração. */
+        printf("=== AST Gerada ===\n");
+        print_ast(ast_root, 0);
+        printf("==================\n\n");
+
+        /* Fase 2: percorrer a AST e executar o programa. */
         EvalResult last = { 0.0, TYPE_INT };
         ASTNode *cur = ast_root;
         while (cur) {
@@ -247,6 +265,12 @@ int main(void) {
         free_ast(ast_root);
         sym_free();
     }
+
+    /* Fecha o arquivo de entrada, se foi aberto */
+    if (argc > 1 && yyin) {
+        fclose(yyin);
+    }
+
     return 0;
 }
 
