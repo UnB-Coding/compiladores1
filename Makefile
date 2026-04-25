@@ -4,11 +4,11 @@ LEXER_EXEC = $(BUILD_DIR)/lexer_exe
 BUILD_DIR  = build
 
 # Arquivos-fonte do Bison e do Flex (parser de exemplo)
-BISON_FILE = parser.y
-FLEX_FILE  = scanner.l
+BISON_FILE = src/parser.y
+FLEX_FILE  = src/scanner.l
 
 # Arquivo-fonte do Lexer standalone (subconjunto C)
-LEXER_FILE = lexer/lexer.l
+LEXER_FILE = examples/lexer.l
 
 # Arquivos que o Bison vai gerar
 BISON_C   = $(BUILD_DIR)/parser.tab.c
@@ -26,7 +26,7 @@ FLEX_FLAGS  =      # deixe vazio ou acrescente opções, se necessário
 
 # Parâmetros de compilação
 CC      = gcc
-CFLAGS  = -I. -Isymbol_table
+CFLAGS  = -I. -Isrc -Isymbol_table
 
 # parser_exe: parser.y fornece main() e scanner.l fornece yywrap() → sem -lfl
 LDFLAGS =
@@ -54,8 +54,8 @@ $(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
 # ========================================================
 # Parser de exemplo (expressões aritméticas)
 # ========================================================
-$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c ast.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c ast.c $(LDFLAGS)
+$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c $(LDFLAGS)
 
 
 
