@@ -294,6 +294,34 @@ class TestTypeCoercion:
         r = parse("float f = 42;")
         assert "f : float = 42" in r["stdout"]
 
+# ---------------------------------------------------------------------------
+# Estruturas aninhadas e complexas
+# ---------------------------------------------------------------------------
+
+
+class TestComplexControlFlow:
+    def test_if_else_aninhado(self, parse):
+        code = "int x = 10; if (x > 5) { if (x > 20) { 1; } else { 2; } } else { 3; }"
+        r = parse(code)
+        assert r["returncode"] == 0
+        assert "Resultado: 2" in r["stdout"]
+        assert "Resultado: 1" not in r["stdout"]
+        assert "Resultado: 3" not in r["stdout"]
+
+    def test_for_com_partes_vazias(self, parse):
+        code = "int x = 0; int i = 0; for (; i < 3;) { x = x + 1; i = i + 1; }"
+        r = parse(code)
+        assert r["returncode"] == 0
+        # a tabela de símbolos deve ter x = 3
+        assert "x : int = 3" in r["stdout"]
+
+    def test_while_aninhado(self, parse):
+        code = "int c = 0; int i = 0; int j = 0; while (i < 2) { j = 0; while (j < 3) { c = c + 1; j = j + 1; } i = i + 1; }"
+        r = parse(code)
+        assert r["returncode"] == 0
+        assert "c : int = 6" in r["stdout"]
+
+
 
 # ---------------------------------------------------------------------------
 # Tabela de símbolos
