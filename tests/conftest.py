@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 import pytest
 
-ROOT      = Path(__file__).parent.parent
+ROOT = Path(__file__).parent.parent
 BUILD_DIR = ROOT / "build"
 
 # No Windows o gcc gera executáveis com .exe; no Linux sem extensão.
@@ -14,19 +14,19 @@ _EXE = ".exe" if sys.platform == "win32" else ""
 # ---------------------------------------------------------------------------
 # Caminhos — lexer standalone
 # ---------------------------------------------------------------------------
-LEXER_TEST_BIN  = BUILD_DIR / f"lexer_test_exe{_EXE}"
-LEXER_YY_C      = BUILD_DIR / "lexer.yy.c"
+LEXER_TEST_BIN = BUILD_DIR / f"lexer_test_exe{_EXE}"
+LEXER_YY_C = BUILD_DIR / "lexer.yy.c"
 LEXER_TEST_MAIN = ROOT / "tests" / "lexer_test_main.c"
 
 # ---------------------------------------------------------------------------
 # Caminhos — scanner + parser
 # ---------------------------------------------------------------------------
-SCANNER_TEST_BIN  = BUILD_DIR / f"scanner_test_exe{_EXE}"
-SCANNER_YY_C      = BUILD_DIR / "lex.yy.c"
-PARSER_TAB_H      = BUILD_DIR / "parser.tab.h"
-PARSER_TAB_C      = BUILD_DIR / "parser.tab.c"
+SCANNER_TEST_BIN = BUILD_DIR / f"scanner_test_exe{_EXE}"
+SCANNER_YY_C = BUILD_DIR / "lex.yy.c"
+PARSER_TAB_H = BUILD_DIR / "parser.tab.h"
+PARSER_TAB_C = BUILD_DIR / "parser.tab.c"
 SCANNER_TEST_MAIN = ROOT / "tests" / "scanner_test_main.c"
-PARSER_EXE        = BUILD_DIR / f"parser_exe{_EXE}"
+PARSER_EXE = BUILD_DIR / f"parser_exe{_EXE}"
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ def _build_lexer_yy_c():
         return
     flex = _find_tool("flex")
     r = subprocess.run(
-        [flex, "-o", str(LEXER_YY_C), str(ROOT / "lexer" / "lexer.l")],
+        [flex, "-o", str(LEXER_YY_C), str(ROOT / "examples" / "lexer.l")],
         cwd=ROOT, capture_output=True, text=True,
     )
     if r.returncode != 0:
@@ -68,7 +68,7 @@ def _build_lexer_test_bin():
     r = subprocess.run(
         [
             gcc,
-            f"-I{ROOT}", f"-I{ROOT / 'symbol_table'}",
+            f"-I{ROOT}", f"-I{ROOT / 'src'}", f"-I{ROOT / 'symbol_table'}",
             "-o", str(LEXER_TEST_BIN),
             str(LEXER_YY_C),
             str(LEXER_TEST_MAIN),
@@ -90,7 +90,7 @@ def _build_parser_tab():
     bison = _find_tool("bison")
     r = subprocess.run(
         [bison, f"--defines={PARSER_TAB_H}", "-o", str(PARSER_TAB_C),
-         str(ROOT / "parser.y")],
+         str(ROOT / "src" / "parser.y")],
         cwd=ROOT, capture_output=True, text=True,
     )
     if r.returncode != 0:
@@ -103,7 +103,7 @@ def _build_scanner_yy_c():
         return
     flex = _find_tool("flex")
     r = subprocess.run(
-        [flex, "-o", str(SCANNER_YY_C), str(ROOT / "scanner.l")],
+        [flex, "-o", str(SCANNER_YY_C), str(ROOT / "src" / "scanner.l")],
         cwd=ROOT, capture_output=True, text=True,
     )
     if r.returncode != 0:
@@ -116,7 +116,7 @@ def _build_scanner_test_bin():
     r = subprocess.run(
         [
             gcc,
-            f"-I{ROOT}", f"-I{BUILD_DIR}", f"-I{ROOT / 'symbol_table'}",
+            f"-I{ROOT}", f"-I{BUILD_DIR}", f"-I{ROOT / 'src'}", f"-I{ROOT / 'symbol_table'}",
             "-o", str(SCANNER_TEST_BIN),
             str(SCANNER_YY_C),
             str(SCANNER_TEST_MAIN),
@@ -133,12 +133,12 @@ def _build_parser_exe():
     r = subprocess.run(
         [
             gcc,
-            f"-I{ROOT}", f"-I{BUILD_DIR}", f"-I{ROOT / 'symbol_table'}",
+            f"-I{ROOT}", f"-I{BUILD_DIR}", f"-I{ROOT / 'src'}", f"-I{ROOT / 'symbol_table'}",
             "-o", str(PARSER_EXE),
             str(PARSER_TAB_C),
             str(SCANNER_YY_C),
             str(ROOT / "symbol_table" / "symtab.c"),
-            str(ROOT / "ast.c"),
+            str(ROOT / "src" / "ast.c"),
         ],
         cwd=ROOT, capture_output=True, text=True,
     )
