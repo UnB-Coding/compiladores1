@@ -243,8 +243,30 @@ class TestControlFlow:
 
 
 # ---------------------------------------------------------------------------
+# Erros de execução (semânticos)
+# ---------------------------------------------------------------------------
+
+class TestExecutionErrors:
+    def test_divisao_por_zero_inteiro(self, parse):
+        r = parse("1 / 0;")
+        assert r["returncode"] != 0
+        assert "divisão por zero" in r["stderr"].lower()
+
+    def test_divisao_por_zero_float(self, parse):
+        r = parse("1.0 / 0.0;")
+        assert r["returncode"] != 0
+        assert "divisão por zero" in r["stderr"].lower()
+
+    def test_variavel_nao_declarada_em_expressao(self, parse):
+        r = parse("int x = y + 1;")
+        assert r["returncode"] != 0
+        assert "não declarada" in r["stderr"].lower()
+
+
+# ---------------------------------------------------------------------------
 # Tabela de símbolos
 # ---------------------------------------------------------------------------
+
 
 class TestSymbolTable:
     def test_tabela_presente_no_output(self, parse):
