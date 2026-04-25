@@ -321,6 +321,33 @@ class TestComplexControlFlow:
         assert r["returncode"] == 0
         assert "c : int = 6" in r["stdout"]
 
+# ---------------------------------------------------------------------------
+# Validação rígida da AST e final
+# ---------------------------------------------------------------------------
+
+
+class TestParserOutput:
+    def test_print_ast_format(self, parse):
+        r = parse("int a = 1 + 2;")
+        assert "=== AST Gerada ===" in r["stdout"]
+        assert "DECL" in r["stdout"]
+        assert "BINOP (+)" in r["stdout"]
+        assert "NUM (1)" in r["stdout"]
+        assert "NUM (2)" in r["stdout"]
+
+# ---------------------------------------------------------------------------
+# Erros sintáticos complexos
+# ---------------------------------------------------------------------------
+
+
+class TestSyntaxErrorsComplex:
+    def test_for_cabecalho_errado(self, parse):
+        r = parse("for (int i = 0 i < 3  i = i + 1) { }")  # falta os ;
+        assert "Erro" in r["stderr"] or "syntax" in r["stderr"]
+
+    def test_blocos_desbalanceados(self, parse):
+        r = parse("{ int x = 1; ")  # falta fecha chaves
+        assert "Erro" in r["stderr"] or "syntax" in r["stderr"]
 
 
 # ---------------------------------------------------------------------------
