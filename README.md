@@ -1,6 +1,6 @@
 # compiladores1
 
-Repositório para um projeto de compilador utilizando **flex** (analisador léxico) e **bison** (analisador sintático).
+Repositório para um projeto de interpretador utilizando **flex** (analisador léxico) e **bison** (analisador sintático).
 
 ---
 
@@ -19,7 +19,7 @@ compiladores1/
 |-------|-----------|
 | `lexer/` | Contém o arquivo `.l` (flex) responsável pela análise léxica. |
 | `parser/` | Contém o arquivo `.y` (bison) responsável pela análise sintática. |
-| `tests/` | Contém os casos de teste para validar o compilador. |
+| `tests/` | Contém os casos de teste para validar o interpretador. |
 | `build/` | Destino dos artefatos gerados pela compilação (objetos, executáveis). O conteúdo desta pasta é ignorado pelo Git. |
 
 ---

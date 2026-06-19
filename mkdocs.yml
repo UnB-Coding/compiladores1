@@ -1,5 +1,5 @@
 site_name: Compiladores 1
-site_description: Documentação do projeto de compilador utilizando flex e bison.
+site_description: Documentação do projeto de interpretador utilizando flex e bison.
 site_author: Equipe
 
 theme:
@@ -28,7 +28,7 @@ theme:
 
 nav:
   - Início: index.md
-  - Compilador:
+  - Interpretador:
     - Como Executar: como_executar.md
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md

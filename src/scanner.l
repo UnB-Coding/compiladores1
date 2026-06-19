@@ -4,7 +4,7 @@ Curso de Engenharia de Software
 Universidade de Brasília (UnB)
 
 Arquivo: scanner.l
-Descrição: Analisador léxico (Flex) para o compilador
+Descrição: Analisador léxico (Flex) para o interpretador
 
 Retorna tokens para literais, operadores, palavras-chave
 de tipo, controle de fluxo (if/else/while/for) e
