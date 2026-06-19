@@ -32,12 +32,12 @@ nav:
     - Como Executar: como_executar.md
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md
+    - Tabela de Símbolos e Tipagem: guia_gramatica.md
     - Explicação dos Arquivos: explicacao_arquivos.md
-    - Guia Gramática: guia_gramatica.md
-    - Testes: tests.md
+    - Testes e Qualidade: tests.md
   - Contribuição: contributing.md
   - Relatórios:
-    - Sprint 1: sprint1.md
+    - Sprints e Evolução: sprints.md
 
 markdown_extensions:
   - admonition

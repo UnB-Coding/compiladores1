@@ -2,7 +2,7 @@
 
 O analisador léxico é o primeiro estágio do nosso front-end. Ele lê o código-fonte C caractere por caractere e agrupa sequências de caracteres (lexemas) em unidades significativas denominadas **tokens**, descartando elementos insignificantes como espaços em branco.
 
-O analisador léxico é gerado automaticamente pelo **Flex** a partir das regras definidas no arquivo [scanner.l](file:///c:/Users/pedro/Desktop/compiladores1/src/scanner.l).
+O analisador léxico é gerado automaticamente pelo **Flex** a partir das regras definidas no arquivo [scanner.l](../src/scanner.l).
 
 ---
 

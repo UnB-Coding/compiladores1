@@ -26,12 +26,12 @@ gantt
 
 ### Sprint 1 e Sprint 2 (Fase de Planejamento e Léxico)
 * **Foco:** Configuração da infraestrutura básica (Makefile, MkDocs) e especificação formal da linguagem de entrada.
-* **O que conseguimos:** Implementação inicial do scanner no arquivo [scanner.l](file:///c:/Users/pedro/Desktop/compiladores1/src/scanner.l) para reconhecer tokens básicos e ignorar espaços em branco. Mapeamento da gramática C básica em notação EBNF.
+* **O que conseguimos:** Implementação inicial do scanner no arquivo [scanner.l](../src/scanner.l) para reconhecer tokens básicos e ignorar espaços em branco. Mapeamento da gramática C básica em notação EBNF.
 * **O que não conseguimos:** A integração sintática ainda não existia; os tokens eram apenas testados isoladamente através de um driver léxico standalone.
 
 ### Sprint 3 e Sprint 4 (Fase Sintática e AST)
 * **Foco:** Criação do parser e definição da estrutura de dados da árvore.
-* **O que conseguimos:** Integração bem-sucedida entre Flex e Bison. Definição da gramática LALR(1) em [parser.y](file:///c:/Users/pedro/Desktop/compiladores1/src/parser.y) suportando expressões, declarações e controle de fluxo básico (`if`, `while`, `for`). Implementação da estrutura de nós na AST em [ast.c](file:///c:/Users/pedro/Desktop/compiladores1/src/ast.c) com suporte para impressão visual.
+* **O que conseguimos:** Integração bem-sucedida entre Flex e Bison. Definição da gramática LALR(1) em [parser.y](../src/parser.y) suportando expressões, declarações e controle de fluxo básico (`if`, `while`, `for`). Implementação da estrutura de nós na AST em [ast.c](../src/ast.c) com suporte para impressão visual.
 * **O que não conseguimos:** O interpretador executava cálculos sem validar tipos (todas as operações assumiam inteiros ou davam comportamento indefinido). Não havia tratamento de escopo ou tratamento correto de colisões na tabela.
 
 ### Sprint 5 e Sprint 6 (Fase Semântica e Qualidade)

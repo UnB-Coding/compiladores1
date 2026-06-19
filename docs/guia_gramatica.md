@@ -1,6 +1,6 @@
 # Tabela de Símbolos, Gramática e Sistema de Tipos
 
-Esta seção detalha o funcionamento da **Tabela de Símbolos** e as regras que regem a semântica de **tipagem e coerção** no compilador, implementadas nos arquivos [symtab.h](file:///c:/Users/pedro/Desktop/compiladores1/symbol_table/symtab.h) e [symtab.c](file:///c:/Users/pedro/Desktop/compiladores1/symbol_table/symtab.c).
+Esta seção detalha o funcionamento da **Tabela de Símbolos** e as regras que regem a semântica de **tipagem e coerção** no compilador, implementadas nos arquivos [symtab.h](../symbol_table/symtab.h) e [symtab.c](../symbol_table/symtab.c).
 
 ---
 

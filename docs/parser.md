@@ -2,7 +2,7 @@
 
 O analisador sintático processa o fluxo de tokens fornecido pelo scanner, valida se o código-fonte obedece às regras gramaticais e constrói a **Árvore Sintática Abstrata (AST)**, que serve de base para o motor semântico e a execução.
 
-A sintaxe é processada por um analisador **LALR(1)** gerado pelo **Bison** a partir do arquivo [parser.y](file:///c:/Users/pedro/Desktop/compiladores1/src/parser.y). A estrutura da AST e as rotinas de manipulação de nós estão em [ast.h](file:///c:/Users/pedro/Desktop/compiladores1/src/ast.h) e [ast.c](file:///c:/Users/pedro/Desktop/compiladores1/src/ast.c).
+A sintaxe é processada por um analisador **LALR(1)** gerado pelo **Bison** a partir do arquivo [parser.y](../src/parser.y). A estrutura da AST e as rotinas de manipulação de nós estão em [ast.h](../src/ast.h) e [ast.c](../src/ast.c).
 
 ---
 
@@ -21,7 +21,7 @@ O analisador sintático e o interpretador AST oferecem suporte completo às segu
 * **Blocos de Código:** Agrupamento de comandos delimitados por chaves `{ stmt_list }`.
 
 ### 1.2 Resolução de Precedência e Associatividade
-Para evitar ambiguidades sem inflar as regras de produção da gramática Bison, a precedência dos operadores foi explicitada no arquivo [parser.y](file:///c:/Users/pedro/Desktop/compiladores1/src/parser.y) por meio das diretivas `%left` e `%right`.
+Para evitar ambiguidades sem inflar as regras de produção da gramática Bison, a precedência dos operadores foi explicitada no arquivo [parser.y](../src/parser.y) por meio das diretivas `%left` e `%right`.
 
 A ordem de avaliação definida (da menor para a maior precedência) é:
 1. `OR` (`||`) — Associativo à esquerda.
@@ -35,7 +35,7 @@ A ordem de avaliação definida (da menor para a maior precedência) é:
 O clássico conflito sintático *dangling-else* foi resolvido nativamente no Bison através de uma precedência implícita de emparelhamento que favorece a ação de *shift* (associando o `else` ao `if` mais interno), o que resulta em apenas 1 conflito shift/reduce previsto (`%expect 1`).
 
 ### 1.3 Estrutura de Nós da AST
-A AST separa a fase de análise da execução. O arquivo [ast.h](file:///c:/Users/pedro/Desktop/compiladores1/src/ast.h) define **14 tipos de nós** que cobrem todo o subconjunto gramatical implementado:
+A AST separa a fase de análise da execução. O arquivo [ast.h](../src/ast.h) define **14 tipos de nós** que cobrem todo o subconjunto gramatical implementado:
 
 | Tipo de Nó | Enumeração (`NodeType`) | Informações Armazenadas |
 | :--- | :--- | :--- |
