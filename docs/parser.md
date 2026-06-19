@@ -59,7 +59,7 @@ A AST separa a fase de análise da execução. O arquivo [ast.h](../src/ast.h) d
 ### 1.4 Rotinas de Execução e Gerenciamento
 * **Tree-Walker Evaluator:** A execução do programa é feita percorrendo a AST de maneira recursiva através da função `eval_ast(ASTNode *node)`. Expressões retornam um tipo estruturado `EvalResult` contendo o valor numérico unificado em um campo `double` e o tipo semântico correspondente (`SymType`), de modo a detectar inconsistências em tempo de execução.
 * **Impressão Visual da AST:** A função `print_ast(ASTNode *node, int level)` percorre a árvore e a exibe no terminal de forma recuada, facilitando a depuração sintática estrutural de qualquer programa fonte C de entrada.
-* **Liberação de Memória:** O compilador faz o gerenciamento dinâmico estrito de memória. A função `free_ast(ASTNode *node)` percorre recursivamente a árvore em pós-ordem, liberando strings duplicadas via `strdup()` em identificadores e declarações, e depois desaloca o próprio nó, eliminando vazamentos de memória.
+* **Liberação de Memória:** O interpretador faz o gerenciamento dinâmico estrito de memória. A função `free_ast(ASTNode *node)` percorre recursivamente a árvore em pós-ordem, liberando strings duplicadas via `strdup()` em identificadores e declarações, e depois desaloca o próprio nó, eliminando vazamentos de memória.
 
 ---
 
@@ -67,7 +67,6 @@ A AST separa a fase de análise da execução. O arquivo [ast.h](../src/ast.h) d
 
 O parser e a AST do projeto atual impõem as seguintes restrições:
 
-* **Sem Geração de Código Python (Transpilação):** O compilador funciona temporariamente como um **interpretador direto de AST**. Ele não emite código Python a partir da AST (embora este seja o objetivo do transpilador final). A execução ocorre de forma embutida em C durante a caminhada na árvore (`eval_ast()`).
 * **Sem Escopos Aninhados Dinâmicos (Locais):** Embora suporte blocos com chaves (`{ ... }`), a tabela de símbolos armazena variáveis de forma global. Não há gerenciamento de escopo dinâmico ou variáveis locais reais para os blocos; redeclarar uma variável dentro de um bloco com chaves que já existe fora dele causa colisão semântica.
 * **Sem Suporte a Funções e Retornos:** Não há regras gramaticais para reconhecer declaração de funções, listas de parâmetros ou instruções de retorno (`return`). O fluxo é executado sequencialmente de cima para baixo.
 * **Sem Controle de Fluxo Avançado:** Comandos de controle alternativos como `break`, `continue`, `switch-case` ou `do-while` não possuem regras de derivação sintática ou nós correspondentes na AST.

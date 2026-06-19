@@ -1,6 +1,6 @@
-# Explicação do Projeto do Compilador
+# Explicação do Projeto do Interpretador
 
-Este documento detalha o propósito e o funcionamento interno de cada arquivo e seus respectivos blocos de código do seu projeto de compilador (baseado em C, utilizando Flex e Bison).
+Este documento detalha o propósito e o funcionamento interno de cada arquivo e seus respectivos blocos de código do seu projeto de interpretador (baseado em C, utilizando Flex e Bison).
 
 ---
 
@@ -19,9 +19,9 @@ CC      = gcc
 CFLAGS  = -I. -Isymbol_table
 LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
 ```
-* **Regras Padrão e de Diretório:** A regra `all` define que, por padrão, o compilador e o lexer standalone devem ser construídos. A regra `$(BUILD_DIR)` garante que a pasta `build` seja criada antes da compilação.
+* **Regras Padrão e de Diretório:** A regra `all` define que, por padrão, o interpretador e o lexer standalone devem ser construídos. A regra `$(BUILD_DIR)` garante que a pasta `build` seja criada antes da compilação.
 * **Lexer Standalone:** Regras para compilar `lexer/lexer.l`. Chama o `flex` para gerar `lexer.yy.c` e depois usa o `gcc` para gerar o executável `lexer_exe`.
-* **Parser Principal:** Define as regras para gerar o interpretador/compilador (`parser_exe`). Primeiro, roda o `bison` em `parser.y` (gerando `.tab.c` e `.tab.h`). Em seguida, roda o `flex` em `scanner.l`. Por fim, compila o código gerado pelo Bison, o código gerado pelo Flex e a tabela de símbolos (`symtab.c`) em um único binário.
+* **Parser Principal:** Define as regras para gerar o interpretador (`parser_exe`). Primeiro, roda o `bison` em `parser.y` (gerando `.tab.c` e `.tab.h`). Em seguida, roda o `flex` em `scanner.l`. Por fim, compila o código gerado pelo Bison, o código gerado pelo Flex e a tabela de símbolos (`symtab.c`) em um único binário.
 ```makefile
 $(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c $(LDFLAGS)
@@ -129,7 +129,7 @@ enum {
 ---
 
 ## 5. `symbol_table/symtab.h`
-**Propósito:** Define a estrutura e as assinaturas de funções para a **Tabela de Símbolos**, essencial para qualquer compilador rastrear variáveis, seus tipos e seus valores em memória.
+**Propósito:** Define a estrutura e as assinaturas de funções para a **Tabela de Símbolos**, essencial para qualquer interpretador rastrear variáveis, seus tipos e seus valores em memória.
 
 * **Definições e Enums:** Define o tamanho fixo da tabela Hash (`SYMTAB_SIZE 211`, um número primo para minimizar colisões) e o enum `SymType`, que representa os tipos internos aceitos (`INT`, `FLOAT`, `CHAR`, `BOOL`).
 * **Unions e Structs:**
@@ -188,7 +188,7 @@ SymEntry *sym_lookup(const char *name) {
 ---
 
 ## 7. `ast.h` e `ast.c`
-**Propósito:** Definem a **Árvore Sintática Abstrata (AST)**. Essa estrutura permite a separação entre a etapa de análise sintática (parsing) e a etapa de execução (avaliação). O parser constrói a árvore e, após sua conclusão, o compilador a percorre para executar o programa.
+**Propósito:** Definem a **Árvore Sintática Abstrata (AST)**. Essa estrutura permite a separação entre a etapa de análise sintática (parsing) e a etapa de execução (avaliação). O parser constrói a árvore e, após sua conclusão, o interpretador a percorre para executar o programa.
 
 ### Estrutura do Nó da Árvore (`ast.h`)
 O cabeçalho define um enumerador (`NodeType`) para os tipos de nós suportados, como comandos condicionais (`IF`), laços de repetição (`WHILE`), literais e operações binárias. A `struct ASTNode` implementa uma `union` para otimização de memória, armazenando os dados específicos estritamente necessários de acordo com o tipo de nó atual:

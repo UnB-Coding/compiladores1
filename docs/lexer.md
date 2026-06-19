@@ -14,7 +14,7 @@ Nosso analisador léxico está totalmente funcional e suporta os seguintes eleme
 * `int` (retorna `T_INT`)
 * `float` (retorna `T_FLOAT`)
 * `char` (retorna `T_CHAR`)
-* `bool` (retorna `T_BOOL`) — Tipo estendido adicionado para modernizar o compilador.
+* `bool` (retorna `T_BOOL`) — Tipo estendido adicionado para modernizar o interpretador.
 
 ### 1.2 Palavras-chave de Controle de Fluxo
 * `if` (retorna `KW_IF`)
@@ -52,7 +52,7 @@ Nosso analisador léxico está totalmente funcional e suporta os seguintes eleme
 
 ## 2. O que NÃO CONSEGUIMOS Fazer (Limitações do Lexer)
 
-Para simplificar o escopo da disciplina e focar no motor do compilador, o analisador léxico **não reconhece nem processa** os seguintes recursos:
+Para simplificar o escopo da disciplina e focar no motor do interpretador, o analisador léxico **não reconhece nem processa** os seguintes recursos:
 
 * **Tipos de Dados Adicionais:** Não há reconhecimento de keywords como `double`, `long`, `short`, `signed`, `unsigned` ou modificadores como `const`, `static`, `volatile`.
 * **Estruturas e Uniões:** Palavras-chave como `struct`, `union`, `enum` e `typedef` não são tokenizadas.

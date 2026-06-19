@@ -1,6 +1,6 @@
 # Tabela de Símbolos, Gramática e Sistema de Tipos
 
-Esta seção detalha o funcionamento da **Tabela de Símbolos** e as regras que regem a semântica de **tipagem e coerção** no compilador, implementadas nos arquivos [symtab.h](../symbol_table/symtab.h) e [symtab.c](../symbol_table/symtab.c).
+Esta seção detalha o funcionamento da **Tabela de Símbolos** e as regras que regem a semântica de **tipagem e coerção** no interpretador, implementadas nos arquivos [symtab.h](../symbol_table/symtab.h) e [symtab.c](../symbol_table/symtab.c).
 
 ---
 
@@ -42,7 +42,7 @@ typedef union {
 ```
 
 ### 1.3 Coerções e Promoções Implícitas
-Durante a avaliação da AST na rotina `eval_ast()`, o compilador resolve as incompatibilidades de tipos de dados de acordo com as seguintes regras semânticas:
+Durante a avaliação da AST na rotina `eval_ast()`, o interpretador resolve as incompatibilidades de tipos de dados de acordo com as seguintes regras semânticas:
 1. **Dominância do Float:** Se qualquer operando em uma expressão binária for do tipo `float` (`TYPE_FLOAT`), o outro operando é convertido implicitamente para ponto flutuante, e a operação gera um resultado do tipo `float`. Exemplo: `1 + 2.5` resulta no valor `3.5` (float).
 2. **Promoção de Char e Bool:** Valores `char` e `bool` são promovidos automaticamente para `int` em operações aritméticas. 
    - Exemplo com Char: `'A' + 1` resulta no inteiro `66`, correspondente ao código ASCII de 'A' (65) acrescido de 1.
@@ -51,7 +51,7 @@ Durante a avaliação da AST na rotina `eval_ast()`, o compilador resolve as inc
 4. **Tratamento de Booleano em Expressões:** Valores relacionais e lógicos retornam inteiro `1` para verdadeiro e `0` para falso na avaliação de comandos condicionais e iterativos.
 
 ### 1.4 Verificação Semântica e Escopo
-* **Redeclaração:** O compilador impede a criação de variáveis com o mesmo identificador. Tentativas de redeclaração (ex: `int a; int a;`) interrompem imediatamente o programa com erro semântico.
+* **Redeclaração:** O interpretador impede a criação de variáveis com o mesmo identificador. Tentativas de redeclaração (ex: `int a; int a;`) interrompem imediatamente o programa com erro semântico.
 * **Variável não declarada:** O uso de qualquer variável em expressões ou atribuições sem uma declaração prévia interrompe a execução com erro e código de falha.
 * **Exibição e Desalocação:** Ao término da execução, a função `sym_print()` exibe formatadamente o valor de cada identificador ativo de acordo com seu tipo, e `sym_free()` limpa recursivamente todos os nós e nomes alocados dinamicamente na tabela.
 
