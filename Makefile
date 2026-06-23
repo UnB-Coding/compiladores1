@@ -54,8 +54,8 @@ $(LEXER_C): $(LEXER_FILE) | $(BUILD_DIR)
 # ========================================================
 # Parser de exemplo (expressões aritméticas)
 # ========================================================
-$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c $(LDFLAGS)
+$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c src/semantic.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c src/semantic.c $(LDFLAGS)
 
 
 
