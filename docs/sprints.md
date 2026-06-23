@@ -1,7 +1,7 @@
 # Histórico de Desenvolvimento e Sprints (Equipa 15)
 
 ## Visão Geral do Projeto
-O projeto visa a construção de um transpilador educativo da linguagem C para Python. O desenvolvimento foi estruturado sob o princípio arquitetural de um "pipeline de fases desacopladas". Até ao momento, a equipa concluiu com sucesso 6 Sprints geridas com a metodologia ágil Scrum.
+O projeto visa a construção de um interpretador educativo da linguagem C. O desenvolvimento foi estruturado sob o princípio arquitetural de um "pipeline de fases desacopladas". Até ao momento, a equipa concluiu com sucesso 6 Sprints geridas com a metodologia ágil Scrum.
 
 ---
 

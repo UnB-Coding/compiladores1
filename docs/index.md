@@ -1,8 +1,8 @@
-# Interpretador C para Python (Equipe 15)
+# Interpretador C (Equipe 15)
 
 Documentação técnica do projeto da **Equipe 15** desenvolvido para a disciplina de **Compiladores 1** da Universidade de Brasília (UnB). 
 
-Desenvolvemos um transpilador completo de um subconjunto estruturado da linguagem C para Python. O interpretador realiza análise léxica e sintática (com construção de AST), validação semântica com verificação e coerção de tipos, geração de código intermediário linear (TAC), otimizações locais (como dobramento de constantes e eliminação de código morto) e transpilação final para código Python equivalente.
+Desenvolvemos um interpretador completo de um subconjunto estruturado da linguagem C. O interpretador realiza análise léxica e sintática (com construção de AST), validação semântica com verificação e coerção de tipos, otimização da árvore sintática (como dobramento de constantes e eliminação de código morto), geração de código intermediário linear (TAC) e execução do código por meio de uma Máquina Virtual interna.
 
 ---
 
@@ -39,8 +39,8 @@ O interpretador aceita e processa com sucesso um código C que contenha:
 * Controle de fluxo estruturado: desvios condicionais `if` e `if/else`, e laços iterativos `while` e `for`.
 * Blocos aninhados de instruções contidos entre chaves `{ ... }`.
 * Geração de código intermediário linear no formato de Código de Três Endereços (TAC).
-* Otimizações locais aplicadas ao código intermediário (como dobramento de constantes e eliminação de código morto).
-* Transpilação final e emissão de código Python equivalente.
+* Otimizações locais da AST (como dobramento de constantes e eliminação de código morto).
+* Execução do código por meio de uma Máquina Virtual baseada em interpretador direto de TAC.
 * Exibição visual da árvore sintática gerada e execução interativa via *tree-walker* (estilo REPL).
 * Desalocação completa de memória pós-ordem (`free_ast()`), garantindo execução livre de vazamentos de memória.
 

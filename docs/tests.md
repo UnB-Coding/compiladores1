@@ -36,5 +36,5 @@ O arquivo [Makefile](../Makefile) centraliza o fluxo de geração de arquivos pe
 ## 2. O que NÃO CONSEGUIMOS Fazer (Limitações de Qualidade e Ambiente)
 
 * **Dependência do Ambiente Local:** A execução automatizada do pytest depende da presença das ferramentas GCC, Flex, Bison e Make instaladas e configuradas no PATH do sistema. Os testes falham de imediato se executados em ambientes Windows nativos que não possuam um subsistema como MSYS2/MinGW habilitado.
-* **Testes de Transpilação e Otimização:** A suíte de testes valida a geração correta das instruções lineares do código intermediário (TAC) e a fidelidade do código Python final gerado pelo transpilador, executando o arquivo Python de saída e validando seus resultados.
+* **Testes de Otimização e Execução na VM:** A suíte de testes ainda não valida de forma automatizada o dobramento de constantes ou a eliminação de código morto na IR, nem a execução sequencial correta das instruções na Máquina Virtual interna.
 * **Ausência de Análise Dinâmica de Memória Automatizada:** Embora tenhamos projetado o desalocador da AST (`free_ast()`) e da tabela de símbolos (`sym_free()`) para evitar vazamentos de memória (memory leaks), a suíte de testes do pytest não executa ferramentas de análise dinâmica de memória (como o *Valgrind*) de forma automatizada no pipeline de testes.
