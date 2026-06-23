@@ -31,7 +31,7 @@
 #define SYMTAB_SIZE 211
 
 /*
- * Tipos suportados pelo compilador.
+ * Tipos suportados pelo interpretador.
  * TYPE_NONE indica que a variável foi usada sem declaração
  * explícita (comportamento legado: assume inteiro).
  */

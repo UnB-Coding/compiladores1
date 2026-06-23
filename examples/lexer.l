@@ -5,7 +5,7 @@ Universidade de Brasília (UnB)
 
 Arquivo: lexer/lexer.l
 Descrição: Analisador léxico para subconjunto da linguagem C
-           (transpilador C → Python)
+           (interpretador de C)
 ******************************************************/
 
 %{

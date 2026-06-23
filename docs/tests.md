@@ -1,177 +1,40 @@
-# Testes
+# Qualidade, Testes e Automação
 
-## Estrutura
-
-```
-tests/
-├── conftest.py           # build automático e fixtures
-├── lexer_test_main.c     # driver C do lexer standalone
-├── scanner_test_main.c   # driver C do scanner (tokens Bison)
-├── test_lexer.py         # testes do lexer/lexer.l
-├── test_scanner.py       # testes do scanner.l
-└── test_parser.py        # testes do parser.y + ast.c
-```
+Para garantir a confiabilidade técnica do front-end e do motor semântico, o projeto conta com uma suíte de testes automatizados e regras de automação de compilação.
 
 ---
 
-## Instalação
+## 1. O que CONSEGUIMOS Fazer (Estrutura de Testes e Automação)
 
-```bash
-pip install -r requirements-test.txt
-```
+### 1.1 Suíte de Testes com Pytest
+A equipe desenvolveu **mais de 150 casos de teste** usando a biblioteca `pytest` do Python. Estes testes estão divididos de forma modular na pasta [tests](../tests):
 
-Dependências de sistema: `gcc`, `flex`, `bison`.
+* [test_lexer.py](../tests/test_lexer.py): validação isolada do analisador léxico standalone, testando reconhecimento de keywords de tipo, literais inteiros/decimais, e o mapeamento de sequências de escape.
+* [test_scanner.py](../tests/test_scanner.py): validação da integração do scanner.l fornecendo tokens para a gramática.
+* [test_parser.py](../tests/test_parser.py): o teste mais complexo da suíte. Alimenta o executável compilado (`parser_exe`) via fluxo de entrada padrão (`stdin`) com fragmentos de código C e assevera:
+  - **Validade Sintática:** Se expressões complexas e controle de fluxo compilam com código de retorno zero.
+  - **Erros Sintáticos:** Valida se a falta de delimitadores (ex: ponto e vírgula, parênteses desbalanceados) reporta erros esperados no fluxo de erro padrão (`stderr`).
+  - **Comportamento da AST e Semântica:** Verifica se as saídas impressas de declarações, atribuições e expressões correspondem aos valores calculados pelo *tree-walker*.
+  - **Erros Semânticos:** Valida a falha controlada do processo e as mensagens de erro em caso de divisões por zero ou uso de variáveis não declaradas.
+  - **Regras de Coerção:** Testa exaustivamente a coerção implícita (truncamentos, promoções aritméticas de booleanos e caracteres).
 
-- **Linux:** `sudo apt install gcc flex bison`
-- **Windows:** MSYS2 com `pacman -S mingw-w64-ucrt-x86_64-gcc flex bison`
+### 1.2 Fixture de Compilação Automatizada
+O arquivo [conftest.py](../tests/conftest.py) gerencia as fixtures do pytest. Ele é responsável por:
+* Invocar a compilação automática dos binários (`make`) na pasta `build/` antes de disparar os testes, garantindo que o pytest sempre execute a versão mais recente do código-fonte em C.
+* Capturar a entrada (`stdin`), saída (`stdout`), erros (`stderr`) e códigos de retorno dos processos executados, permitindo asserções programáticas flexíveis.
 
----
+### 1.3 Cobertura com Pytest-Cov
+* A cobertura de testes do código C e Python é medida e reportada graficamente na pasta `build/coverage_html/` através do módulo `pytest-cov`, permitindo auditoria visual dos caminhos de execução validados.
 
-## Como rodar
-
-```bash
-# Todos os testes (com relatório de cobertura)
-python -m pytest
-
-# Saída detalhada por teste
-python -m pytest -v
-
-# Filtrar por suíte ou categoria
-python -m pytest tests/test_parser.py
-python -m pytest -k TestDeclarations
-
-# Parar no primeiro erro
-python -m pytest -x
-```
-
-O `pytest.ini` define `testpaths = tests`, então não é necessário passar o caminho.
+### 1.4 Automação de Compilação (Makefile)
+O arquivo [Makefile](../Makefile) centraliza o fluxo de geração de arquivos pelo Flex e Bison e a compilação final dos executáveis.
+* **Executável Principal:** `build/parser_exe` (compilado a partir do Bison `parser.tab.c`, Flex `lex.yy.c`, `src/ast.c` e `symbol_table/symtab.c`).
+* **Regras Auxiliares:** Suporte para compilar o lexer standalone e limpar artefatos (`make clean`).
 
 ---
 
-## Relatório de cobertura
+## 2. O que NÃO CONSEGUIMOS Fazer (Limitações de Qualidade e Ambiente)
 
-Ao rodar `python -m pytest`, o terminal exibe automaticamente:
-
-```
-Name                    Stmts   Miss  Cover   Missing
------------------------------------------------------
-tests\conftest.py          99     19    81%   39-47, 57-63 ...
-tests\test_lexer.py       175      0   100%
-tests\test_parser.py      171      0   100%
-tests\test_scanner.py     205      0   100%
------------------------------------------------------
-TOTAL                     650     19    97%
-```
-
-- **`Stmts`** — linhas executáveis
-- **`Miss`** — linhas não executadas por nenhum teste
-- **`Missing`** — números das linhas não cobertas
-
-O relatório HTML completo é gerado em `build/coverage_html/index.html`.
-
-> O `conftest.py` tem 81% porque as linhas faltantes são blocos de tratamento de erro dos builds (ex: `raise RuntimeError` quando `flex` falha). Esses caminhos só executam em ambientes quebrados — não vale testá-los.
-
-> A cobertura mede apenas o código **Python** (`conftest.py` e arquivos `test_*.py`). O código C (`ast.c`, `scanner.l`, `parser.y`) roda como processo externo via `subprocess` e não é medido aqui.
-
----
-
-## Fixtures
-
-O `conftest.py` compila os binários automaticamente antes dos testes, sem precisar rodar `make`.
-
-| Fixture | Binário | Tokens |
-|---|---|---|
-| `lex` | `build/lexer_test_exe` | `KW_INT`, `IDENTIFIER`, `OP_PLUS` |
-| `scan` | `build/scanner_test_exe` | `T_INT`, `ID`, `PLUS` |
-| `parse` | `build/parser_exe` | recebe código C, retorna `stdout`/`stderr`/`returncode` |
-
-### `lex` e `scan`
-
-Ambas recebem uma string de código e retornam uma lista de dicionários `{"type": ..., "value": ...}`:
-
-```python
-tokens = lex("int x = 42;")
-# [{"type": "KW_INT", "value": "int"}, {"type": "IDENTIFIER", "value": "x"}, ...]
-
-tokens = scan("int x = 42;")
-# [{"type": "T_INT", "value": "int"}, {"type": "ID", "value": "x"}, ...]
-```
-
-### `parse`
-
-Executa o parser completo com o código recebido via stdin:
-
-```python
-r = parse("int x = 5; x + 1;")
-r["returncode"]  # 0 = sem erro de compilação
-r["stdout"]      # "Declarado: x : int = 5\nResultado: 6\n..."
-r["stderr"]      # mensagens de erro sintático/semântico
-```
-
-Formato do stdout:
-
-| Comando C | Saída |
-|---|---|
-| `int x = 5;` | `Declarado: x : int = 5` |
-| `int x;` | `Declarado: x : int` |
-| `x = 10;` | `int x = 10` |
-| `3 + 4;` | `Resultado: 7` |
-| fim do programa | `--- Tabela de Símbolos ---` |
-
-> `parser.y` sempre termina com `exit 0`, mesmo em erro sintático. Para verificar erros, cheque `r["stderr"]`.
-
----
-
-## Casos de teste
-
-### `test_lexer.py` — `lexer/lexer.l`
-
-| Classe | Cobre |
-|---|---|
-| `TestKeywords` | `int`, `float`, `char`, `long`, `double`, `short`, `signed`, `unsigned` |
-| `TestControlFlowKeywords` | `if`, `else`, `while`, `for`, `do`, `switch`, `case`, `break`, `continue`, `return` |
-| `TestIdentifiers` | simples, `_prefixo`, camelCase, com dígitos, não começa com dígito |
-| `TestLiterals` | inteiro, float, notação científica, string, char |
-| `TestOperators` | aritméticos, relacionais, lógicos, atribuição |
-| `TestDelimiters` | `{}`, `()`, `[]`, `;`, `,` |
-| `TestWhitespaceAndComments` | espaços, tabs, `\n`, comentários `//` e `/* */` |
-| `TestRealisticInput` | trechos reais de código C |
-
-### `test_scanner.py` — `scanner.l`
-
-| Classe | Cobre |
-|---|---|
-| `TestTypeKeywords` | `T_INT`, `T_FLOAT`, `T_CHAR`, `T_BOOL` |
-| `TestControlFlowKeywords` | `KW_IF/ELSE/WHILE/FOR`; prefixo de keyword vira `ID` |
-| `TestBoolLiterals` | `TRUE_LIT`, `FALSE_LIT`; `truex` → `ID` |
-| `TestIdentifiers` | simples, underscore, camelCase, com dígitos |
-| `TestNumericLiterals` | `NUM`, `FLOAT_LIT`; float reconhecido antes de inteiro |
-| `TestCharLiterals` | `'a'`, `'\n'`, `'\t'`, `'\\'` |
-| `TestArithmeticOperators` | `PLUS`, `MINUS`, `TIMES`, `DIVIDE` |
-| `TestRelationalOperators` | `EQ/NE/LE/GE/LT/GT`; `=` não confunde com `==` |
-| `TestLogicalOperators` | `AND`, `OR`, `NOT`; `!` não confunde com `!=` |
-| `TestAssignAndDelimiters` | `ASSIGN`, `SEMICOLON`, `LPAREN/RPAREN`, `LBRACE/RBRACE` |
-| `TestWhitespace` | espaços, tabs, newlines ignorados; entrada vazia |
-| `TestRealisticSequences` | declaração, `if`, `while`, `for`, bloco, bool |
-
-### `test_parser.py` — `parser.y` + `ast.c`
-
-| Classe | Cobre |
-|---|---|
-| `TestSyntaxValidity` | programas válidos (exit 0); erros sintáticos no stderr |
-| `TestDeclarations` | `int`, `float`, `char`, `bool` com e sem init; redeclaração falha |
-| `TestAssignments` | saída `tipo nome = valor`; variável não declarada falha |
-| `TestExpressionStatements` | aritmética, divisão inteira vs float, precedência, lógica |
-| `TestControlFlow` | `if`/`else`, `while`, `for` iterando, blocos `{}` |
-| `TestSymbolTable` | tabela presente, `(vazia)` sem variáveis, valor final correto |
-
----
-
-## Makefile
-
-```bash
-make        # compila parser_exe e lexer_exe
-make clean  # remove artefatos de build
-```
-
-Os testes **não dependem do `make`** — o `conftest.py` compila tudo automaticamente.
+* **Dependência do Ambiente Local:** A execução automatizada do pytest depende da presença das ferramentas GCC, Flex, Bison e Make instaladas e configuradas no PATH do sistema. Os testes falham de imediato se executados em ambientes Windows nativos que não possuam um subsistema como MSYS2/MinGW habilitado.
+* **Testes de Otimização e Execução na VM:** A suíte de testes ainda não valida de forma automatizada o dobramento de constantes ou a eliminação de código morto na IR, nem a execução sequencial correta das instruções na Máquina Virtual interna.
+* **Ausência de Análise Dinâmica de Memória Automatizada:** Embora tenhamos projetado o desalocador da AST (`free_ast()`) e da tabela de símbolos (`sym_free()`) para evitar vazamentos de memória (memory leaks), a suíte de testes do pytest não executa ferramentas de análise dinâmica de memória (como o *Valgrind*) de forma automatizada no pipeline de testes.

@@ -1,5 +1,5 @@
 site_name: Compiladores 1
-site_description: Documentação do projeto de compilador utilizando flex e bison.
+site_description: Documentação do projeto de interpretador utilizando flex e bison.
 site_author: Equipe
 
 theme:
@@ -28,17 +28,16 @@ theme:
 
 nav:
   - Início: index.md
-  - Compilador:
+  - Interpretador:
     - Como Executar: como_executar.md
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md
-    - Código Intermediário (TAC): codigo_intermediario.md
+    - Tabela de Símbolos e Tipagem: guia_gramatica.md
     - Explicação dos Arquivos: explicacao_arquivos.md
-    - Guia Gramática: guia_gramatica.md
-    - Testes: tests.md
+    - Testes e Qualidade: tests.md
   - Contribuição: contributing.md
   - Relatórios:
-    - Sprint 1: sprint1.md
+    - Sprints e Evolução: sprints.md
 
 markdown_extensions:
   - admonition

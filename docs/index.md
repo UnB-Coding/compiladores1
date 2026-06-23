@@ -1,51 +1,51 @@
-# Compiladores 1
+# Interpretador C (Equipe 15)
 
-Bem-vindo à documentação do projeto de compilador! Este projeto utiliza **flex** para análise léxica e **bison** para análise sintática.
+Documentação técnica do projeto da **Equipe 15** desenvolvido para a disciplina de **Compiladores 1** da Universidade de Brasília (UnB). 
 
-## Estrutura do Projeto
+Desenvolvemos um interpretador completo de um subconjunto estruturado da linguagem C. O interpretador realiza análise léxica e sintática (com construção de AST), validação semântica com verificação e coerção de tipos, otimização da árvore sintática (como dobramento de constantes e eliminação de código morto), geração de código intermediário linear (TAC) e execução do código por meio de uma Máquina Virtual interna.
 
-```text
-compiladores1/
-├── lexer/      # Analisador léxico (flex / lex)
-├── parser/     # Analisador sintático (bison / yacc)
-├── tests/      # Casos de teste
-├── build/      # Artefatos compilados (gerado durante o build)
-└── README.md
-```
+---
 
-| Pasta | Descrição |
-|-------|-----------|
-| `lexer/` | Contém o arquivo `.l` (flex) responsável pela análise léxica. |
-| `parser/` | Contém o arquivo `.y` (bison) responsável pela análise sintática. |
-| `tests/` | Contém os casos de teste para validar o compilador. |
-| `build/` | Destino dos artefatos gerados pela compilação. Ignorado pelo Git. |
+## Membros da Equipe 15
+* Vitor Feijó Leonardo
+* Caio Pacheco Santos
+* Hauedy Wegener Soares
+* Gabriel Henrique Castelo Costa
+* Pedro Henrique Ferreira Xavier
 
-## Subconjunto de gramática C usado
+---
 
-Neste projeto é usado um subconjunto da linguagem C, que inclui:
+## Como a Documentação está Organizada
 
-- Declaração de variáveis
-- Atribuição de variáveis
-- Operadores aritméticos
-- Operadores relacionais
-- Operadores lógicos
-- Estruturas condicionais `if` e `else`
-- Estruturas de repetição `while` e `for`
-- Funções
-- Comentários
+* **[Evolução do Projeto e Sprints](sprints.md):** Histórico de desenvolvimento (Sprints 1 a 8) utilizando Scrum e a experiência com a prática de Pair Programming.
+* **[Analisador Léxico (Flex)](lexer.md):** Regras de expressões regulares, mapeamento de keywords, tratamento de sequências de escape em caracteres e limitações léxicas.
+* **[Analisador Sintático e AST](parser.md):** Integração Flex-Bison, resolução de precedências de operadores, estrutura de 14 nós da AST, caminhada da árvore (*tree-walker*) e liberação de memória.
+* **[Tabela de Símbolos e Tipagem](guia_gramatica.md):** Funcionamento do algoritmo de hash `djb2`, buckets para tratamento de colisões e regras de coerção e promoção implícitas.
+* **[Qualidade, Testes e Automação](tests.md):** Estruturação da suíte com mais de 150 testes em `pytest`, fixture de build e relatórios de cobertura com `pytest-cov`.
+* **[Como Executar](como_executar.md):** Instruções e pré-requisitos para compilar e testar o interpretador localmente.
+* **[Explicação dos Arquivos](explicacao_arquivos.md):** Arquitetura interna e mapeamento de diretórios do repositório.
+* **[Contribuição](contributing.md):** Diretrizes para desenvolvimento colaborativo no repositório.
 
-## Pré-requisitos
+---
 
-- **flex** ≥ 2.6
-- **bison** ≥ 3.0
-- **gcc** / **g++**
-- **make**
+## Visão Geral do Escopo do Interpretador
 
-## Como compilar
+### O que CONSEGUIMOS Fazer (Funcionalidades Ativas)
+O interpretador aceita e processa com sucesso um código C que contenha:
+* Declarações de variáveis de tipo `int`, `float`, `char` e `bool` com inicializações opcionais (ex: `int x = 10;`).
+* Atribuições simples a variáveis previamente declaradas (`x = x + 5;`).
+* Expressões complexas relacionais, lógicas e aritméticas com precedência matemática correta (ex: `2 + 3 * 4` resulta em `14`).
+* Coerções implícitas e promoções de tipos conforme o padrão ANSI C (como promover `char` para `int` em operações aritméticas e truncar `float` para `int` em atribuições).
+* Controle de fluxo estruturado: desvios condicionais `if` e `if/else`, e laços iterativos `while` e `for`.
+* Blocos aninhados de instruções contidos entre chaves `{ ... }`.
+* Geração de código intermediário linear no formato de Código de Três Endereços (TAC).
+* Otimizações locais da AST (como dobramento de constantes e eliminação de código morto).
+* Execução do código por meio de uma Máquina Virtual baseada em interpretador direto de TAC.
+* Exibição visual da árvore sintática gerada e execução interativa via *tree-walker* (estilo REPL).
+* Desalocação completa de memória pós-ordem (`free_ast()`), garantindo execução livre de vazamentos de memória.
 
-A partir da raiz do projeto:
-
-```bash
-make          # compila tudo em build/
-make clean    # remove os artefatos
-```
+### O que NÃO CONSEGUIMOS Fazer (Limitações Atuais)
+* **Sem Funções ou Sub-rotinas:** A linguagem executa apenas linearmente. Não há sintaxe para declaração de funções ou desvio `return`.
+* **Sem Pointers, Arrays ou Structs:** Tipos avançados (ponteiros, vetores e estruturas) não são reconhecidos.
+* **Sem Desvios Secundários:** O interpretador não suporta palavras-chave de escape ou controle fino como `break`, `continue`, `switch-case` ou `do-while`.
+* **Sem Pré-processador:** Diretivas como `#include` ou `#define` não são processadas.

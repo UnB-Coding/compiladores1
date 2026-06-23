@@ -1,82 +1,89 @@
-# Analisador Léxico
+# Analisador Léxico (Scanner / Flex)
 
-Esta seção detalha a implementação do analisador léxico, localizado no diretório `lexer/`.
+O analisador léxico é o primeiro estágio do nosso front-end. Ele lê o código-fonte C caractere por caractere e agrupa sequências de caracteres (lexemas) em unidades significativas denominadas **tokens**, descartando elementos insignificantes como espaços em branco.
 
-A ferramenta responsável pela geração do analisador léxico é o **Flex** (Fast Lexical Analyzer Generator). O objetivo do analisador léxico é ler o código-fonte de entrada caractere por caractere e agrupá-los em tokens (como palavras-chave, identificadores, números, operadores, etc.).
+O analisador léxico é gerado automaticamente pelo **Flex** a partir das regras definidas no arquivo [scanner.l](../src/scanner.l).
 
-## Visão Geral
+---
 
-- **Arquivo fonte:** Normalmente `lexer/lexer.l` (ou similar).
-- **Entrada:** Código-fonte da linguagem.
-- **Saída:** Fluxo de tokens para o analisador sintático (Bison).
+## 1. O que CONSEGUIMOS Fazer (Funcionalidades Implementadas)
 
-## Subconjunto de gramática C
+Nosso analisador léxico está totalmente funcional e suporta os seguintes elementos da linguagem de entrada:
 
-- Tipos:
-  - int
-  - float
-  - char
-  - long
-  - double
-  - short
-  - signed
-  - unsigned
-- Expressões de controle:
-  - if
-  - else
-  - while
-  - for
-  - do while
-  - switch
-  - case
-  - break
-  - continue
-  - return
-- Operadores:
-  - - - - /
-  - =
-  - ==
-  - !=
+### 1.1 Palavras-chave de Tipo
+* `int` (retorna `T_INT`)
+* `float` (retorna `T_FLOAT`)
+* `char` (retorna `T_CHAR`)
+* `bool` (retorna `T_BOOL`) — Tipo estendido adicionado para modernizar o interpretador.
 
-## Formalização (EBNF)
+### 1.2 Palavras-chave de Controle de Fluxo
+* `if` (retorna `KW_IF`)
+* `else` (retorna `KW_ELSE`)
+* `while` (retorna `KW_WHILE`)
+* `for` (retorna `KW_FOR`)
 
-Para a estruturação das regras no analisador sintático, o subconjunto acima foi mapeado na seguinte notação:
+### 1.3 Literais e Valores Especiais
+* **Literais Inteiros:** Cadeias de dígitos numéricos (ex: `123`), capturados pela regex `[0-9]+` e convertidos via `atoi()`. Retorna o valor numérico em `yylval.intValue`.
+* **Literais de Ponto Flutuante:** Números decimais (ex: `3.14`, `.5`, `2.`), capturados pela regex `[0-9]+\.[0-9]*|\.[0-9]+` e convertidos via `atof()`. Retorna o valor em `yylval.floatValue`.
+* **Literais Booleans:** Reconhece `true` (retorna `TRUE_LIT` com `yylval.intValue = 1`) e `false` (retorna `FALSE_LIT` com `yylval.intValue = 0`).
+* **Literais de Caractere (Simples):** Caractere único delimitado por aspas simples (ex: `'A'`). A regex `'[^\\']'` captura o caractere na posição `yytext[1]` e retorna em `yylval.charValue`.
+* **Sequências de Escape em Caracteres:** Trata escapes clássicos da linguagem C através da regra `'\\.'` e mapeamento interno via `switch-case`:
+  - `\n` (quebra de linha)
+  - `\t` (tabulação)
+  - `\r` (retorno de carro)
+  - `\0` (caractere nulo)
+  - `\\` (barra invertida)
+  - `\'` (aspas simples)
+  - Outros padrões como `\a`, `\b`, `\f`, `\v`, `\"`, `\?`.
+  - Retorna o caractere decodificado em `yylval.charValue` sob o token `CHAR_LIT`.
 
-```ebnf
-<tipo> ::= "int" | "float" | "char" | "long" | "double" | "short"
-<modificador> ::= "signed" | "unsigned"
+### 1.4 Identificadores
+* Nomes de variáveis iniciados por letra ou sublinhado, seguidos de letras, dígitos ou sublinhados (ex: `idade`, `_contador_1`). Capturado por `[a-zA-Z_][a-zA-Z0-9_]*`.
+* Realiza a duplicação dinâmica do lexema usando `strdup(yytext)` e passa para o Bison através de `yylval.strValue`.
 
-<comando_selecao> ::= "if" "(" <expressao> ")" <bloco> ["else" <bloco>]
-                    | "switch" "(" <expressao> ")" "{" <lista_casos> "}"
+### 1.5 Operadores e Delimitadores
+* **Aritméticos:** `+` (`PLUS`), `-` (`MINUS`), `*` (`TIMES`), `/` (`DIVIDE`).
+* **Atribuição:** `=` (`ASSIGN`).
+* **Relacionais:** `==` (`EQ`), `!=` (`NE`), `<` (`LT`), `>` (`GT`), `<=` (`LE`), `>=` (`GE`).
+* **Lógicos:** `&&` (`AND`), `||` (`OR`), `!` (`NOT`).
+* **Pontuação/Estruturais:** `(` (`LPAREN`), `)` (`RPAREN`), `{` (`LBRACE`), `}` (`RBRACE`), `;` (`SEMICOLON`).
 
-<comando_repeticao> ::= "while" "(" <expressao> ")" <bloco>
-                      | "do" <bloco> "while" "(" <expressao> ")" ";"
-                      | "for" "(" [<expressao>] ";" [<expressao>] ";" [<expressao>] ")" <bloco>
+---
 
-<comando_salto> ::= "return" [<expressao>] ";" | "break" ";" | "continue" ";"
+## 2. O que NÃO CONSEGUIMOS Fazer (Limitações do Lexer)
+
+Para simplificar o escopo da disciplina e focar no motor do interpretador, o analisador léxico **não reconhece nem processa** os seguintes recursos:
+
+* **Tipos de Dados Adicionais:** Não há reconhecimento de keywords como `double`, `long`, `short`, `signed`, `unsigned` ou modificadores como `const`, `static`, `volatile`.
+* **Estruturas e Uniões:** Palavras-chave como `struct`, `union`, `enum` e `typedef` não são tokenizadas.
+* **Comandos de Salto e Desvio:** Palavras-chave `break`, `continue`, `return`, `switch`, `case`, `default`, `do` não são mapeadas em tokens.
+* **Literais de Cadeias de Caracteres (Strings):** Não há suporte para strings entre aspas duplas (ex: `"texto"`). Apenas literais de caractere único (`'c'`) são analisados.
+* **Comentários:** O analisador léxico atual não possui regras para filtrar ou ignorar comentários de linha (`//`) ou de bloco (`/* ... */`).
+* **Diretivas do Pré-processador:** Diretivas iniciadas com `#` (ex: `#include`, `#define`) não são suportadas.
+* **Operadores Avançados:** Operadores de ponteiro (`&`, `*`), atribuição composta (`+=`, `-=`, `*=`, `/=`), incremento/decremento (`++`, `--`), deslocamento (`<<`, `>>`) ou acesso a membros (`.`, `->`) não são reconhecidos.
+* **Erros Léxicos:** Caracteres que não casam com nenhuma das regras (ex: `@`, `$`, `?`) são reportados na saída padrão (`printf("Caractere não reconhecido...")`), mas não interrompem o analisador de imediato, repassando um token desconhecido.
+
+---
+
+## 3. Interface Léxico-Sintática (Flex para Bison)
+
+A comunicação do Lexer com o Parser é feita através da variável global `yylval`. A união semântica (`%union` do Bison) define quais tipos de valores podem ser enviados:
+
+```c
+%union {
+    int    intValue;    /* Usado por NUM, TRUE_LIT, FALSE_LIT */
+    double floatValue;  /* Usado por FLOAT_LIT */
+    char   charValue;   /* Usado por CHAR_LIT */
+    char  *strValue;    /* Usado por ID */
+    struct ASTNode *node;
+}
 ```
 
-## Especificação de Tokens e Mapeamento
-
-Para a tarefa S1-05, definimos os padrões léxicos e os identificadores que serão passados ao Bison:
-
-| Token | Padrão (Regex) | Descrição |
-| :--- | :--- | :--- |
-| **ID** | `[a-zA-Z_][a-zA-Z0-9_]*` | Identificadores de variáveis/funções |
-| **NUM_INT** | `[0-9]+` | Literais inteiros |
-| **NUM_FLOAT** | `[0-9]*\.[0-9]+` | Literais de ponto flutuante |
-| **STRING** | `\"([^\\\"]|\\.)*\"` | Literais de string |
-| **TK_OP** | `+`, `-`, `*`, `/`, `=`, `==`, `!=` | Operadores aritméticos e lógicos |
-
-## Limitações e Escopo Não Implementado
-
-Para delimitar o desenvolvimento do compilador, os seguintes recursos não serão suportados:
-
-* **Ponteiros:** Não haverá suporte para operadores de endereço (`&`) e desreferência (`*`).
-* **Estruturas Complexas:** `struct`, `union` e `enum` não fazem parte deste subconjunto.
-* **Pré-processador:** Diretivas como `#include` e `#define` não serão processadas.
-* **Qualificadores:** Não há suporte para `const`, `static` ou `volatile`.
-* **Bibliotecas Externas:** Funções da biblioteca padrão (ex: `printf`) serão tratadas apenas como identificadores comuns.
-
-Mais detalhes da implementação devem ser documentados aqui à medida que o código evolui.
-
+Cada correspondência léxica de literal ou identificador preenche a variável apropriada no membro `yylval` antes de dar o `return` para o Bison. Por exemplo, ao encontrar um identificador:
+```lex
+[a-zA-Z_][a-zA-Z0-9_]*  {
+    yylval.strValue = strdup(yytext);
+    return ID;
+}
+```
+O Bison consome o token `ID` e tem acesso imediato à string alocada por `yylval.strValue`. A memória desta string deve ser desalocada posteriormente.
