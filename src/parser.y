@@ -18,6 +18,7 @@ estáticos. Só depois a execução ocorre em eval_ast().
 #include <stdlib.h>
 #include "ast.h"
 #include "semantic.h"
+#include "ir.h"
 #include "symbol_table/symtab.h"
 
 /* Variável global do Flex: define o arquivo de entrada do scanner */
@@ -262,7 +263,17 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
-        /* Fase 3: percorrer a AST e executar o programa. */
+        /* Fase 3: Geração de código intermediário (TAC).
+         * Percorre a AST e produz uma representação linear,
+         * independente de máquina, que serve de base para
+         * futuras otimizações e geração de código final. */
+        printf("=== Código Intermediário (TAC) ===\n");
+        IRProgram *ir = gen_ir(ast_root);
+        ir_print(ir);
+        ir_free(ir);
+        printf("==================================\n\n");
+
+        /* Fase 4: percorrer a AST e executar o programa. */
         EvalResult last = { 0.0, TYPE_INT };
         ASTNode *cur = ast_root;
         while (cur) {

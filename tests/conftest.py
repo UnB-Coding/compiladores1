@@ -140,6 +140,7 @@ def _build_parser_exe():
             str(ROOT / "symbol_table" / "symtab.c"),
             str(ROOT / "src" / "ast.c"),
             str(ROOT / "src" / "semantic.c"),
+            str(ROOT / "src" / "ir.c"),
         ],
         cwd=ROOT, capture_output=True, text=True,
     )
