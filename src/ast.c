@@ -234,12 +234,8 @@ EvalResult eval_ast(ASTNode *node) {
 
     /* ---- Identificador ---- */
     case AST_ID: {
+        /* A análise semântica já garantiu que a variável existe */
         SymEntry *e = sym_lookup(node->data.id.name);
-        if (!e) {
-            fprintf(stderr, "Erro: variável '%s' não declarada\n",
-                    node->data.id.name);
-            exit(EXIT_FAILURE);
-        }
         result.val  = sym_val_as_double(e);
         result.type = e->type;
         break;
@@ -354,12 +350,8 @@ EvalResult eval_ast(ASTNode *node) {
     /* ---- Atribuição ---- */
     case AST_ASSIGN: {
         EvalResult rhs = eval_ast(node->data.assign.expr);
+        /* A análise semântica já garantiu que a variável existe */
         SymEntry *e = sym_lookup(node->data.assign.name);
-        if (!e) {
-            fprintf(stderr, "Erro: variável '%s' não declarada\n",
-                    node->data.assign.name);
-            exit(EXIT_FAILURE);
-        }
         e->value = to_sym_value(e->type, rhs.val);
         printf("%s %s = ", sym_type_name(e->type), node->data.assign.name);
         print_value(e->type, sym_val_as_double(e));
@@ -369,12 +361,7 @@ EvalResult eval_ast(ASTNode *node) {
 
     /* ---- Declaração ---- */
     case AST_DECL: {
-        SymEntry *e = sym_lookup(node->data.decl.name);
-        if (e) {
-            fprintf(stderr, "Erro: variável '%s' já declarada\n",
-                    node->data.decl.name);
-            exit(EXIT_FAILURE);
-        }
+        /* A análise semântica já garantiu que não há redeclaração */
         double init_val = 0.0;
         if (node->data.decl.init) {
             EvalResult r = eval_ast(node->data.decl.init);

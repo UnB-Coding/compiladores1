@@ -8,14 +8,17 @@ Descrição: Gramática LALR(1) que constrói uma AST
 
 As ações semânticas APENAS constroem nós da AST.
 Nenhuma execução (cálculos, Tabela de Símbolos, I/O)
-ocorre durante o parsing. A execução acontece depois,
-em eval_ast().
+ocorre durante o parsing. Após a construção da AST,
+a análise semântica (analyze_ast) verifica erros
+estáticos. Só depois a execução ocorre em eval_ast().
 ******************************************************/
 
 %{
 #include <stdio.h>
 #include <stdlib.h>
 #include "ast.h"
+#include "semantic.h"
+#include "ir.h"
 #include "symbol_table/symtab.h"
 
 /* Variável global do Flex: define o arquivo de entrada do scanner */
@@ -249,7 +252,28 @@ int main(int argc, char **argv) {
         print_ast(ast_root, 0);
         printf("==================\n\n");
 
-        /* Fase 2: percorrer a AST e executar o programa. */
+        /* Fase 2: Análise semântica.
+         * Percorre a AST inteira (incluindo dead code) para
+         * detectar erros estáticos antes da execução. */
+        int sem_errors = analyze_ast(ast_root);
+        if (sem_errors > 0) {
+            /* Erros semânticos encontrados — não executa. */
+            free_ast(ast_root);
+            if (argc > 1 && yyin) fclose(yyin);
+            return EXIT_FAILURE;
+        }
+
+        /* Fase 3: Geração de código intermediário (TAC).
+         * Percorre a AST e produz uma representação linear,
+         * independente de máquina, que serve de base para
+         * futuras otimizações e geração de código final. */
+        printf("=== Código Intermediário (TAC) ===\n");
+        IRProgram *ir = gen_ir(ast_root);
+        ir_print(ir);
+        ir_free(ir);
+        printf("==================================\n\n");
+
+        /* Fase 4: percorrer a AST e executar o programa. */
         EvalResult last = { 0.0, TYPE_INT };
         ASTNode *cur = ast_root;
         while (cur) {
