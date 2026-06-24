@@ -54,31 +54,35 @@ class TestIRExpressions:
         assert "t0" not in ir
 
     def test_binop_gera_temporario(self, parse):
-        ir = _ir(parse("int x = 3 + 4;")["stdout"])
-        assert "t0 = 3 + 4" in ir
+        # Usa variável para impedir constant folding pelo optimizer.
+        ir = _ir(parse("int a = 3; int x = a + 4;")["stdout"])
+        assert "t0 = a + 4" in ir
         assert "x = t0" in ir
 
     def test_precedencia_ordena_temporarios(self, parse):
-        # 2 + 3 * 4 → multiplicação primeiro
-        ir = _ir(parse("2 + 3 * 4;")["stdout"])
-        assert "t0 = 3 * 4" in ir
-        assert "t1 = 2 + t0" in ir
+        # a + b * 4 → multiplicação antes da soma (variáveis impedem folding).
+        ir = _ir(parse("int a = 2; int b = 3; a + b * 4;")["stdout"])
+        assert "t0 = b * 4" in ir
+        assert "t1 = a + t0" in ir
 
     def test_constante_embutida_no_operando(self, parse):
-        # Constantes não são materializadas em temporário próprio.
-        ir = _ir(parse("int x = 5 * 2;")["stdout"])
-        assert "t0 = 5 * 2" in ir
+        # Constantes não são materializadas em temporário próprio;
+        # usar variável para que o binop não seja dobrado pelo optimizer.
+        ir = _ir(parse("int x = 0; int y = x * 2;")["stdout"])
+        assert "t0 = x * 2" in ir
 
     def test_unario_negativo(self, parse):
         ir = _ir(parse("int x = 1; int y = -x;")["stdout"])
         assert "t0 = -x" in ir
 
     def test_unario_not(self, parse):
-        ir = _ir(parse("!0;")["stdout"])
-        assert "t0 = !0" in ir
+        # Usa variável para que !x não seja dobrado pelo optimizer.
+        ir = _ir(parse("int x = 0; !x;")["stdout"])
+        assert "t0 = !x" in ir
 
     def test_operadores_relacionais_e_logicos(self, parse):
-        ir = _ir(parse("(1 < 2) && (3 == 3);")["stdout"])
+        # Usa variáveis para impedir folding das subexpressões.
+        ir = _ir(parse("int a = 1; int b = 2; (a < b) && (b == b);")["stdout"])
         assert "<" in ir and "==" in ir and "&&" in ir
 
 
@@ -108,7 +112,8 @@ class TestIRControlFlow:
         assert "L0:" in ir
 
     def test_if_else_tem_goto(self, parse):
-        ir = _ir(parse("if (1) { 1; } else { 2; }")["stdout"])
+        # Usa variável para impedir DCE pelo optimizer.
+        ir = _ir(parse("int x = 1; if (x) { 1; } else { 2; }")["stdout"])
         assert "ifFalse" in ir
         assert "goto L" in ir
 
