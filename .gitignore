@@ -66,3 +66,4 @@ __pycache__/
 *$py.class
 .coverage
 .pytest_cache
+site/
