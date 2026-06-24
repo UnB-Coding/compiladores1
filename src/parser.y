@@ -20,6 +20,7 @@ estáticos. Só depois a execução ocorre em eval_ast().
 #include "semantic.h"
 #include "optimize.h"
 #include "ir.h"
+#include "vm.h"
 #include "symbol_table/symtab.h"
 
 /* Variável global do Flex: define o arquivo de entrada do scanner */
@@ -281,14 +282,14 @@ int main(int argc, char **argv) {
         ir_free(ir);
         printf("==================================\n\n");
 
-        /* Fase 5: percorrer a AST e executar o programa. */
-        EvalResult last = { 0.0, TYPE_INT };
-        ASTNode *cur = ast_root;
-        while (cur) {
-            last = eval_ast(cur);
-            cur = cur->next;
-        }
-        (void)last;  /* suprime aviso de variável não usada */
+        /* Fase 5: Geração de bytecode e execução via VM. */
+        printf("=== Bytecode ===\n");
+        BCProgram *bc = bc_compile(ast_root);
+        bc_print(bc);
+        printf("================\n\n");
+
+        vm_run(bc);
+        bc_free(bc);
 
         /* Imprime a tabela de símbolos final */
         sym_print();

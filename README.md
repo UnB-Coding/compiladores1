@@ -15,12 +15,12 @@ compiladores1/
 └── README.md
 ```
 
-| Pasta | Descrição |
-|-------|-----------|
-| `lexer/` | Contém o arquivo `.l` (flex) responsável pela análise léxica. |
-| `parser/` | Contém o arquivo `.y` (bison) responsável pela análise sintática. |
-| `tests/` | Contém os casos de teste para validar o interpretador. |
-| `build/` | Destino dos artefatos gerados pela compilação (objetos, executáveis). O conteúdo desta pasta é ignorado pelo Git. |
+| Pasta     | Descrição                                                                                                         |
+| --------- | ----------------------------------------------------------------------------------------------------------------- |
+| `lexer/`  | Contém o arquivo `.l` (flex) responsável pela análise léxica.                                                     |
+| `parser/` | Contém o arquivo `.y` (bison) responsável pela análise sintática.                                                 |
+| `tests/`  | Contém os casos de teste para validar o interpretador.                                                            |
+| `build/`  | Destino dos artefatos gerados pela compilação (objetos, executáveis). O conteúdo desta pasta é ignorado pelo Git. |
 
 ---
 
@@ -59,16 +59,16 @@ Este projeto segue o padrão [Conventional Commits](https://www.conventionalcomm
 
 ### Tipos permitidos
 
-| Tipo | Quando usar |
-|------|-------------|
-| `feat` | Adição de nova funcionalidade |
-| `fix` | Correção de bug |
-| `docs` | Apenas alterações na documentação |
-| `style` | Formatação, ponto e vírgula, espaçamento (sem mudança de lógica) |
-| `refactor` | Refatoração de código sem correção de bug nem nova funcionalidade |
-| `test` | Adição ou correção de testes |
-| `chore` | Tarefas de manutenção, CI, build (sem mudança de código de produção) |
-| `build` | Mudanças no sistema de build ou dependências externas |
+| Tipo       | Quando usar                                                          |
+| ---------- | -------------------------------------------------------------------- |
+| `feat`     | Adição de nova funcionalidade                                        |
+| `fix`      | Correção de bug                                                      |
+| `docs`     | Apenas alterações na documentação                                    |
+| `style`    | Formatação, ponto e vírgula, espaçamento (sem mudança de lógica)     |
+| `refactor` | Refatoração de código sem correção de bug nem nova funcionalidade    |
+| `test`     | Adição ou correção de testes                                         |
+| `chore`    | Tarefas de manutenção, CI, build (sem mudança de código de produção) |
+| `build`    | Mudanças no sistema de build ou dependências externas                |
 
 ### Escopos sugeridos
 
@@ -92,20 +92,20 @@ Este projeto adota um modelo baseado no **Git Flow** simplificado.
 
 ### Branches principais
 
-| Branch | Descrição |
-|--------|-----------|
-| `main` | Código estável, pronto para entrega. Nenhum commit direto. |
+| Branch    | Descrição                                                   |
+| --------- | ----------------------------------------------------------- |
+| `main`    | Código estável, pronto para entrega. Nenhum commit direto.  |
 | `develop` | Integração contínua das funcionalidades em desenvolvimento. |
 
 ### Branches de suporte
 
-| Prefixo | Propósito | Criada a partir de | Merge em |
-|---------|-----------|-------------------|----------|
-| `feature/<descricao>` | Nova funcionalidade | `develop` | `develop` |
-| `fix/<descricao>` | Correção de bug | `develop` | `develop` |
-| `hotfix/<descricao>` | Correção urgente em produção | `main` | `main` e `develop` |
-| `release/<versao>` | Preparação de uma release | `develop` | `main` e `develop` |
-| `docs/<descricao>` | Atualização de documentação | `develop` | `develop` |
+| Prefixo               | Propósito                    | Criada a partir de | Merge em           |
+| --------------------- | ---------------------------- | ------------------ | ------------------ |
+| `feature/<descricao>` | Nova funcionalidade          | `develop`          | `develop`          |
+| `fix/<descricao>`     | Correção de bug              | `develop`          | `develop`          |
+| `hotfix/<descricao>`  | Correção urgente em produção | `main`             | `main` e `develop` |
+| `release/<versao>`    | Preparação de uma release    | `develop`          | `main` e `develop` |
+| `docs/<descricao>`    | Atualização de documentação  | `develop`          | `develop`          |
 
 ### Regras
 
@@ -126,7 +126,7 @@ docs/atualiza-convencoes
 
 ### Testes
 
-#### Como funciona 
+#### Como funciona
 
 O conftest.py compila build/lexer.yy.c + tests/lexer_test_main.c com gcc sem -lfl, porque o driver fornece o próprio main. A fixture lex passa código C pela stdin do binário e parseia a saída:
 
@@ -139,10 +139,13 @@ TOKEN SEMICOLON ;
 #### Para rodar
 
 # Instalar pytest (já feito)
+
 pip install pytest
 
 # Rodar todos os testes
+
 python -m pytest
 
 # Rodar com saída detalhada
+
 python -m pytest -v
