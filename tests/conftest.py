@@ -141,8 +141,6 @@ def _build_parser_exe():
             str(ROOT / "src" / "ast.c"),
             str(ROOT / "src" / "semantic.c"),
             str(ROOT / "src" / "ir.c"),
-            str(ROOT / "src" / "optimize.c"),
-            str(ROOT / "src" / "vm.c"),
         ],
         cwd=ROOT, capture_output=True, text=True,
     )

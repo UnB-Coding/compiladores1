@@ -18,9 +18,7 @@ estáticos. Só depois a execução ocorre em eval_ast().
 #include <stdlib.h>
 #include "ast.h"
 #include "semantic.h"
-#include "optimize.h"
 #include "ir.h"
-#include "vm.h"
 #include "symbol_table/symtab.h"
 
 /* Variável global do Flex: define o arquivo de entrada do scanner */
@@ -265,31 +263,23 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
-        /* Fase 3: Otimização da AST.
-         * Aplica constant folding e dead code elimination
-         * em pós-ordem até atingir ponto fixo. */
-        ast_root = optimize_ast(ast_root);
-        printf("=== AST Otimizada ===\n");
-        print_ast(ast_root, 0);
-        printf("=====================\n\n");
-
-        /* Fase 4: Geração de código intermediário (TAC).
-         * Percorre a AST otimizada e produz uma representação
-         * linear, independente de máquina. */
+        /* Fase 3: Geração de código intermediário (TAC).
+         * Percorre a AST e produz uma representação linear. */
         printf("=== Código Intermediário (TAC) ===\n");
         IRProgram *ir = gen_ir(ast_root);
         ir_print(ir);
-        ir_free(ir);
         printf("==================================\n\n");
 
-        /* Fase 5: Geração de bytecode e execução via VM. */
-        printf("=== Bytecode ===\n");
-        BCProgram *bc = bc_compile(ast_root);
-        bc_print(bc);
-        printf("================\n\n");
+        /* Fase 4: Otimização do IR.
+         * Constant folding, propagação de constantes e DCE. */
+        printf("=== IR Otimizado ===\n");
+        ir_optimize(ir);
+        ir_print(ir);
+        printf("====================\n\n");
 
-        vm_run(bc);
-        bc_free(bc);
+        /* Fase 5: Execução via IR. */
+        ir_exec(ir);
+        ir_free(ir);
 
         /* Imprime a tabela de símbolos final */
         sym_print();

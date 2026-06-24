@@ -275,16 +275,20 @@ static void gen_stmt(IRProgram *p, ASTNode *node) {
 
     switch (node->kind) {
 
-    /* ---- Declaração: registra o tipo e, se houver init, copia ---- */
-    case AST_DECL:
+    /* ---- Declaração: emite IR_DECL e, se houver init, IR_COPY ---- */
+    case AST_DECL: {
         type_env_set(node->data.decl.name, node->data.decl.type);
-        if (node->data.decl.init) {
+        int has_init = node->data.decl.init ? 1 : 0;
+        emit(p, IR_DECL, has_init,
+             opnd_var(node->data.decl.name, node->data.decl.type),
+             opnd_none(), opnd_none());
+        if (has_init) {
             IROperand rhs = gen_expr(p, node->data.decl.init);
             IROperand dst = opnd_var(node->data.decl.name, node->data.decl.type);
             emit(p, IR_COPY, 0, dst, rhs, opnd_none());
         }
-        /* Declaração sem inicialização não gera código. */
         break;
+    }
 
     /* ---- Atribuição: var = expr ---- */
     case AST_ASSIGN: {
@@ -295,10 +299,12 @@ static void gen_stmt(IRProgram *p, ASTNode *node) {
         break;
     }
 
-    /* ---- Expressão como comando: avalia e descarta o resultado ---- */
-    case AST_EXPR_STMT:
-        (void)gen_expr(p, node->data.expr_stmt.expr);
+    /* ---- Expressão como comando: avalia e emite IR_PRINT ---- */
+    case AST_EXPR_STMT: {
+        IROperand res = gen_expr(p, node->data.expr_stmt.expr);
+        emit(p, IR_PRINT, 0, opnd_none(), res, opnd_none());
         break;
+    }
 
     /* ---- If / If-Else ----
      *   t = cond
@@ -508,8 +514,410 @@ void ir_print(const IRProgram *prog) {
             print_operand(&ins->arg1);
             printf("\n");
             break;
+
+        case IR_DECL:
+            printf("    decl %s : %s%s\n",
+                   ins->dest.u.name, sym_type_name(ins->dest.type),
+                   ins->op ? " (init)" : "");
+            break;
+
+        case IR_PRINT:
+            printf("    print ");
+            print_operand(&ins->arg1);
+            printf("\n");
+            break;
         }
     }
+}
+
+/* ====================================================
+ * Otimização do IR
+ * ==================================================== */
+
+static int is_const_opnd(IROperand o) {
+    return o.kind == OPND_CONST_INT  || o.kind == OPND_CONST_FLOAT ||
+           o.kind == OPND_CONST_CHAR || o.kind == OPND_CONST_BOOL;
+}
+
+static double const_opnd_val(IROperand o) {
+    return o.kind == OPND_CONST_FLOAT ? o.u.fconst : (double)o.u.iconst;
+}
+
+static IROperand make_const_opnd(SymType type, double val) {
+    if (type == TYPE_FLOAT) return opnd_const_float(val);
+    return opnd_const_int((int)val, type);
+}
+
+static double ir_compute_binop(int op, double lv, double rv,
+                               SymType lt, SymType rt) {
+    int use_float = (lt == TYPE_FLOAT || rt == TYPE_FLOAT);
+    switch (op) {
+    case '+': return use_float ? lv + rv : (double)((int)lv + (int)rv);
+    case '-': return use_float ? lv - rv : (double)((int)lv - (int)rv);
+    case '*': return use_float ? lv * rv : (double)((int)lv * (int)rv);
+    case '/': return use_float ? lv / rv : (double)((int)lv / (int)rv);
+    case '&': return (double)(lv != 0.0 && rv != 0.0);
+    case '|': return (double)(lv != 0.0 || rv != 0.0);
+    case 'E': return (double)(lv == rv);
+    case 'N': return (double)(lv != rv);
+    case '<': return (double)(lv <  rv);
+    case '>': return (double)(lv >  rv);
+    case 'l': return (double)(lv <= rv);
+    case 'g': return (double)(lv >= rv);
+    default:  return 0.0;
+    }
+}
+
+/* Pass 1: Constant Folding — BINOP/UNARYOP com operandos constantes → COPY */
+static int ir_pass_const_fold(IRProgram *prog) {
+    int changed = 0;
+    for (IRInstr *ins = prog->head; ins; ins = ins->next) {
+        if (ins->opcode == IR_BINOP &&
+            is_const_opnd(ins->arg1) && is_const_opnd(ins->arg2)) {
+            if (ins->op == '/' && const_opnd_val(ins->arg2) == 0.0) continue;
+            SymType lt    = ins->arg1.type;
+            SymType rt    = ins->arg2.type;
+            SymType rtype = binop_result_type(ins->op, lt, rt);
+            double  res   = ir_compute_binop(ins->op,
+                                             const_opnd_val(ins->arg1),
+                                             const_opnd_val(ins->arg2),
+                                             lt, rt);
+            /* arg1/arg2 são OPND_CONST_* — sem heap alocado; sobrescreve direto */
+            ins->opcode = IR_COPY;
+            ins->op     = 0;
+            ins->arg1   = make_const_opnd(rtype, res);
+            ins->arg2   = opnd_none();
+            changed = 1;
+        } else if (ins->opcode == IR_UNARYOP && is_const_opnd(ins->arg1)) {
+            double av = const_opnd_val(ins->arg1);
+            double res;
+            SymType rtype;
+            switch (ins->op) {
+            case '-': res = -av;               rtype = ins->arg1.type; break;
+            case '!': res = (double)(av==0.0); rtype = TYPE_INT;       break;
+            default:  continue;
+            }
+            ins->opcode = IR_COPY;
+            ins->op     = 0;
+            ins->arg1   = make_const_opnd(rtype, res);
+            changed = 1;
+        }
+    }
+    return changed;
+}
+
+/* Pass 2: Propagação de Constantes — t = const → substitui usos de t */
+static int ir_pass_const_propagate(IRProgram *prog) {
+    if (prog->temp_count == 0) return 0;
+    IROperand *known = (IROperand *)calloc(prog->temp_count, sizeof(IROperand));
+    if (!known) return 0;
+
+    for (IRInstr *ins = prog->head; ins; ins = ins->next) {
+        if (ins->opcode == IR_COPY &&
+            ins->dest.kind == OPND_TEMP &&
+            is_const_opnd(ins->arg1)) {
+            known[ins->dest.u.temp] = ins->arg1;
+        }
+    }
+
+    int changed = 0;
+    for (IRInstr *ins = prog->head; ins; ins = ins->next) {
+        if (ins->arg1.kind == OPND_TEMP &&
+            ins->arg1.u.temp < prog->temp_count &&
+            known[ins->arg1.u.temp].kind != OPND_NONE) {
+            ins->arg1 = known[ins->arg1.u.temp];
+            changed = 1;
+        }
+        if (ins->arg2.kind == OPND_TEMP &&
+            ins->arg2.u.temp < prog->temp_count &&
+            known[ins->arg2.u.temp].kind != OPND_NONE) {
+            ins->arg2 = known[ins->arg2.u.temp];
+            changed = 1;
+        }
+    }
+
+    free(known);
+    return changed;
+}
+
+/* Pass 3: Dead Code Elimination — remove código após IR_GOTO e IFFALSE(const) */
+static int ir_pass_dce(IRProgram *prog) {
+    int changed = 0;
+    int in_dead = 0;
+    IRInstr *prev = NULL;
+    IRInstr *cur  = prog->head;
+
+    while (cur) {
+        if (in_dead) {
+            if (cur->opcode == IR_LABEL) {
+                in_dead = 0;
+            } else {
+                IRInstr *next = cur->next;
+                if (prev) prev->next = next;
+                else      prog->head = next;
+                if (cur == prog->tail) prog->tail = prev;
+                if (cur->dest.kind == OPND_VAR && cur->dest.u.name)
+                    { free(cur->dest.u.name); cur->dest.u.name = NULL; }
+                if (cur->arg1.kind == OPND_VAR && cur->arg1.u.name)
+                    { free(cur->arg1.u.name); cur->arg1.u.name = NULL; }
+                if (cur->arg2.kind == OPND_VAR && cur->arg2.u.name)
+                    { free(cur->arg2.u.name); cur->arg2.u.name = NULL; }
+                free(cur);
+                cur = next;
+                changed = 1;
+                continue;
+            }
+        }
+
+        if (cur->opcode == IR_IFFALSE && is_const_opnd(cur->arg1)) {
+            double cv = const_opnd_val(cur->arg1);
+            if (cv == 0.0) {
+                cur->opcode = IR_GOTO;
+                cur->arg1   = cur->arg2;
+                cur->arg2   = opnd_none();
+                in_dead = 1;
+                changed = 1;
+            } else {
+                IRInstr *next = cur->next;
+                if (prev) prev->next = next;
+                else      prog->head = next;
+                if (cur == prog->tail) prog->tail = prev;
+                free(cur);
+                cur = next;
+                changed = 1;
+                continue;
+            }
+        } else if (cur->opcode == IR_GOTO) {
+            in_dead = 1;
+        }
+
+        prev = cur;
+        cur  = cur->next;
+    }
+    return changed;
+}
+
+void ir_optimize(IRProgram *prog) {
+    if (!prog) return;
+    int changed;
+    do {
+        changed  = ir_pass_const_fold(prog);
+        changed |= ir_pass_const_propagate(prog);
+        changed |= ir_pass_dce(prog);
+    } while (changed);
+}
+
+/* ====================================================
+ * Execução do IR
+ * ==================================================== */
+
+typedef struct { double val; SymType type; } IRValue;
+
+static SymValue ir_to_sym_value(SymType type, double val) {
+    SymValue v;
+    switch (type) {
+        case TYPE_FLOAT: v.fVal = (float)val;     break;
+        case TYPE_CHAR:  v.cVal = (char)(int)val; break;
+        case TYPE_BOOL:  v.iVal = !!((int)val);   break;
+        default:         v.iVal = (int)val;        break;
+    }
+    return v;
+}
+
+static double ir_sym_val_as_double(const SymEntry *e) {
+    switch (e->type) {
+        case TYPE_FLOAT: return (double)e->value.fVal;
+        case TYPE_CHAR:  return (double)e->value.cVal;
+        default:         return (double)e->value.iVal;
+    }
+}
+
+static void ir_print_value(SymType type, double val) {
+    switch (type) {
+        case TYPE_FLOAT: printf("%g", val); break;
+        case TYPE_CHAR: {
+            char c = (char)(int)val;
+            if (c >= 32 && c < 127) printf("'%c'", c);
+            else                    printf("%d", (int)c);
+            break;
+        }
+        case TYPE_BOOL: printf("%s", ((int)val) ? "true" : "false"); break;
+        default:        printf("%d", (int)val); break;
+    }
+}
+
+static IRValue ir_read_operand(IROperand op, IRValue *temps) {
+    IRValue v = {0.0, TYPE_INT};
+    switch (op.kind) {
+    case OPND_CONST_INT:
+    case OPND_CONST_CHAR:
+    case OPND_CONST_BOOL:
+        v.val  = (double)op.u.iconst;
+        v.type = op.type;
+        break;
+    case OPND_CONST_FLOAT:
+        v.val  = op.u.fconst;
+        v.type = TYPE_FLOAT;
+        break;
+    case OPND_TEMP:
+        if (temps) v = temps[op.u.temp];
+        break;
+    case OPND_VAR: {
+        SymEntry *e = sym_lookup(op.u.name);
+        if (e) { v.val = ir_sym_val_as_double(e); v.type = e->type; }
+        break;
+    }
+    default:
+        break;
+    }
+    return v;
+}
+
+static IRValue ir_exec_binop(int op, IRValue l, IRValue r) {
+    IRValue res;
+    int use_float = (l.type == TYPE_FLOAT || r.type == TYPE_FLOAT);
+    switch (op) {
+    case '+': res.val = use_float ? l.val+r.val : (double)((int)l.val+(int)r.val); break;
+    case '-': res.val = use_float ? l.val-r.val : (double)((int)l.val-(int)r.val); break;
+    case '*': res.val = use_float ? l.val*r.val : (double)((int)l.val*(int)r.val); break;
+    case '/':
+        if (r.val == 0.0) { fprintf(stderr, "Erro: divisão por zero\n"); exit(EXIT_FAILURE); }
+        res.val = use_float ? l.val/r.val : (double)((int)l.val/(int)r.val); break;
+    case '&': res.val = (double)(l.val != 0.0 && r.val != 0.0); break;
+    case '|': res.val = (double)(l.val != 0.0 || r.val != 0.0); break;
+    case 'E': res.val = (double)(l.val == r.val); break;
+    case 'N': res.val = (double)(l.val != r.val); break;
+    case '<': res.val = (double)(l.val <  r.val); break;
+    case '>': res.val = (double)(l.val >  r.val); break;
+    case 'l': res.val = (double)(l.val <= r.val); break;
+    case 'g': res.val = (double)(l.val >= r.val); break;
+    default:  res.val = 0.0; break;
+    }
+    res.type = binop_result_type(op, l.type, r.type);
+    return res;
+}
+
+static IRValue ir_exec_unaryop(int op, IRValue a) {
+    IRValue res;
+    switch (op) {
+    case '-': res.val = -a.val;             res.type = a.type;   break;
+    case '!': res.val = (double)(!a.val);   res.type = TYPE_INT; break;
+    default:  res.val = 0.0;                res.type = TYPE_INT; break;
+    }
+    return res;
+}
+
+void ir_exec(IRProgram *prog) {
+    if (!prog || !prog->head) return;
+
+    int n = 0;
+    for (IRInstr *ins = prog->head; ins; ins = ins->next) n++;
+
+    IRInstr **instrs = (IRInstr **)malloc(n * sizeof(IRInstr *));
+    if (!instrs) { fprintf(stderr, "Erro: ir_exec malloc\n"); exit(EXIT_FAILURE); }
+    { int i = 0; for (IRInstr *ins = prog->head; ins; ins = ins->next) instrs[i++] = ins; }
+
+    int *label_map = NULL;
+    if (prog->label_count > 0) {
+        label_map = (int *)calloc(prog->label_count, sizeof(int));
+        if (!label_map) { fprintf(stderr, "Erro: ir_exec calloc\n"); exit(EXIT_FAILURE); }
+        for (int i = 0; i < n; i++)
+            if (instrs[i]->opcode == IR_LABEL)
+                label_map[instrs[i]->dest.u.label] = i;
+    }
+
+    IRValue *temps = NULL;
+    if (prog->temp_count > 0) {
+        temps = (IRValue *)calloc(prog->temp_count, sizeof(IRValue));
+        if (!temps) { fprintf(stderr, "Erro: ir_exec calloc\n"); exit(EXIT_FAILURE); }
+    }
+
+    const char *pending_decl = NULL;
+
+    for (int ip = 0; ip < n; ) {
+        IRInstr *ins = instrs[ip];
+        switch (ins->opcode) {
+
+        case IR_LABEL:
+            break;
+
+        case IR_GOTO:
+            ip = label_map[ins->arg1.u.label];
+            continue;
+
+        case IR_IFFALSE: {
+            IRValue cond = ir_read_operand(ins->arg1, temps);
+            if (cond.val == 0.0) {
+                ip = label_map[ins->arg2.u.label];
+                continue;
+            }
+            break;
+        }
+
+        case IR_DECL: {
+            SymValue zero; zero.iVal = 0;
+            sym_set(ins->dest.u.name, ins->dest.type, zero);
+            if (!ins->op) {
+                printf("Declarado: %s : %s\n",
+                       ins->dest.u.name, sym_type_name(ins->dest.type));
+            } else {
+                pending_decl = ins->dest.u.name;
+            }
+            break;
+        }
+
+        case IR_COPY: {
+            IRValue val = ir_read_operand(ins->arg1, temps);
+            if (ins->dest.kind == OPND_TEMP) {
+                if (temps) temps[ins->dest.u.temp] = val;
+            } else {
+                SymValue sv = ir_to_sym_value(ins->dest.type, val.val);
+                SymEntry *e = sym_set(ins->dest.u.name, ins->dest.type, sv);
+                double stored = ir_sym_val_as_double(e);
+                if (pending_decl &&
+                    strcmp(pending_decl, ins->dest.u.name) == 0) {
+                    printf("Declarado: %s : %s = ",
+                           ins->dest.u.name, sym_type_name(ins->dest.type));
+                    ir_print_value(ins->dest.type, stored);
+                    printf("\n");
+                    pending_decl = NULL;
+                } else {
+                    printf("%s %s = ",
+                           sym_type_name(ins->dest.type), ins->dest.u.name);
+                    ir_print_value(ins->dest.type, stored);
+                    printf("\n");
+                }
+            }
+            break;
+        }
+
+        case IR_BINOP: {
+            IRValue l = ir_read_operand(ins->arg1, temps);
+            IRValue r = ir_read_operand(ins->arg2, temps);
+            if (temps) temps[ins->dest.u.temp] = ir_exec_binop(ins->op, l, r);
+            break;
+        }
+
+        case IR_UNARYOP: {
+            IRValue a = ir_read_operand(ins->arg1, temps);
+            if (temps) temps[ins->dest.u.temp] = ir_exec_unaryop(ins->op, a);
+            break;
+        }
+
+        case IR_PRINT: {
+            IRValue v = ir_read_operand(ins->arg1, temps);
+            printf("Resultado: ");
+            ir_print_value(v.type, v.val);
+            printf("\n");
+            break;
+        }
+        }
+        ip++;
+    }
+
+    free(instrs);
+    if (label_map) free(label_map);
+    if (temps) free(temps);
 }
 
 /* ====================================================
