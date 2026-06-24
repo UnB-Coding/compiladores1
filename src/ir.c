@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include "ir.h"
 #include "symbol_table/symtab.h"
 
@@ -568,6 +569,16 @@ static double ir_compute_binop(int op, double lv, double rv,
     }
 }
 
+/* INT_MIN / -1 estoura o intervalo de int (UB em C: SIGFPE em x86).
+ * Detecta esse caso para a divisão inteira, tratando-o como erro fatal
+ * de execução — análogo à divisão por zero. */
+static int is_int_div_overflow(int op, double lv, double rv,
+                               SymType lt, SymType rt) {
+    if (op != '/') return 0;
+    if (lt == TYPE_FLOAT || rt == TYPE_FLOAT) return 0;
+    return (int)lv == INT_MIN && (int)rv == -1;
+}
+
 /* Pass 1: Constant Folding — BINOP/UNARYOP com operandos constantes → COPY */
 static int ir_pass_const_fold(IRProgram *prog) {
     int changed = 0;
@@ -575,6 +586,11 @@ static int ir_pass_const_fold(IRProgram *prog) {
         if (ins->opcode == IR_BINOP &&
             is_const_opnd(ins->arg1) && is_const_opnd(ins->arg2)) {
             if (ins->op == '/' && const_opnd_val(ins->arg2) == 0.0) continue;
+            /* Não dobra INT_MIN / -1: deixa o erro surgir na execução. */
+            if (is_int_div_overflow(ins->op,
+                                    const_opnd_val(ins->arg1),
+                                    const_opnd_val(ins->arg2),
+                                    ins->arg1.type, ins->arg2.type)) continue;
             SymType lt    = ins->arg1.type;
             SymType rt    = ins->arg2.type;
             SymType rtype = binop_result_type(ins->op, lt, rt);
@@ -782,6 +798,10 @@ static IRValue ir_exec_binop(int op, IRValue l, IRValue r) {
     case '*': res.val = use_float ? l.val*r.val : (double)((int)l.val*(int)r.val); break;
     case '/':
         if (r.val == 0.0) { fprintf(stderr, "Erro: divisão por zero\n"); exit(EXIT_FAILURE); }
+        if (is_int_div_overflow(op, l.val, r.val, l.type, r.type)) {
+            fprintf(stderr, "Erro: overflow em divisão de inteiros (INT_MIN / -1)\n");
+            exit(EXIT_FAILURE);
+        }
         res.val = use_float ? l.val/r.val : (double)((int)l.val/(int)r.val); break;
     case '&': res.val = (double)(l.val != 0.0 && r.val != 0.0); break;
     case '|': res.val = (double)(l.val != 0.0 || r.val != 0.0); break;

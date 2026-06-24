@@ -25,6 +25,9 @@ e executada por ir_exec().
 /* Variável global do Flex: define o arquivo de entrada do scanner */
 extern FILE *yyin;
 
+/* Contador de erros léxicos mantido pelo scanner (scanner.l) */
+extern int lexical_errors;
+
 /* Declarações para evitar avisos de função implícita */
 int yylex(void);
 void yyerror(const char *s);
@@ -246,7 +249,18 @@ int main(int argc, char **argv) {
         yyin = f;
     }
 
-    if (yyparse() == 0 && ast_root) {
+    int parse_ok = (yyparse() == 0);
+
+    /* Erros léxicos (caracteres não reconhecidos) invalidam a varredura
+     * inteira: não executa e encerra com código de erro. */
+    if (lexical_errors > 0) {
+        fprintf(stderr, "%d erro(s) léxico(s) encontrado(s).\n", lexical_errors);
+        if (ast_root) free_ast(ast_root);
+        if (argc > 1 && yyin) fclose(yyin);
+        return EXIT_FAILURE;
+    }
+
+    if (parse_ok && ast_root) {
         /* Fase 1 concluída: AST construída com sucesso.
          * Imprime a árvore para demonstração. */
         printf("=== AST Gerada ===\n");

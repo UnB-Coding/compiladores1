@@ -262,6 +262,27 @@ class TestExecutionErrors:
         assert r["returncode"] != 0
         assert "não declarada" in r["stderr"].lower()
 
+    def test_overflow_int_min_dividido_por_menos_um(self, parse):
+        # INT_MIN / -1 estoura o int (UB em C → SIGFPE). Deve ser tratado
+        # como erro fatal de execução, não causar crash. Divisor em variável
+        # impede o constant folding, exercitando o guarda em ir_exec_binop.
+        r = parse("int x = -2147483648;\nint y = x / -1;")
+        assert r["returncode"] != 0
+        assert "overflow" in r["stderr"].lower()
+
+    def test_overflow_int_min_constante_foldada(self, parse):
+        # Mesmo overflow com operandos constantes: o folder NÃO deve dobrar
+        # (o que travaria durante a otimização) — o erro surge na execução.
+        r = parse("int y = (-2147483647 - 1) / -1;")
+        assert r["returncode"] != 0
+        assert "overflow" in r["stderr"].lower()
+
+    def test_int_min_outras_divisoes_nao_estouram(self, parse):
+        # Apenas INT_MIN / -1 estoura; outros divisores são válidos.
+        r = parse("int a = -2147483648 / 2;\nint b = -2147483648 / 1;")
+        assert r["returncode"] == 0
+        assert "overflow" not in r["stderr"].lower()
+
 # ---------------------------------------------------------------------------
 # Promoção e Coerção de Tipos
 # ---------------------------------------------------------------------------

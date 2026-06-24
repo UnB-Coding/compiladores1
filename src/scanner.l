@@ -16,6 +16,10 @@ delimitadores de bloco.
 #include <stdlib.h>
 #include <string.h>
 #include "parser.tab.h"  /* contém definições geradas pelo Bison (NUM, PLUS, etc.) */
+
+/* Conta caracteres não reconhecidos durante a varredura.
+ * main() consulta este valor para encerrar com código de erro. */
+int lexical_errors = 0;
 %}
 
 %%
@@ -111,7 +115,10 @@ delimitadores de bloco.
 
 [ \t\n]+  { /* ignora espaços, tabs e quebras de linha */ }
 
-.        { printf("Caractere não reconhecido: %s\n", yytext); }
+.        {
+    fprintf(stderr, "Erro léxico: caractere não reconhecido: %s\n", yytext);
+    lexical_errors++;
+}
 
 %%
 

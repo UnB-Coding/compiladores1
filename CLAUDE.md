@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An educational **tree-walking interpreter** for a small subset of C, built for the UnB course *FGA0003 — Compiladores 1*. It uses **Flex** (scanner) + **Bison** (parser) to build an AST, runs a semantic pass over it, and then either evaluates the AST directly or lowers it to a three-address-code IR. Documentation and code comments are in Portuguese; keep that convention. Commits follow Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`) with scopes like `lexer`, `parser`, `tests`, `build`, `docs`.
+An educational **interpreter** for a small subset of C, built for the UnB course *FGA0003 — Compiladores 1*. It uses **Flex** (scanner) + **Bison** (parser) to build an AST, runs a semantic pass over it, lowers the AST to a three-address-code (TAC) IR, optimizes that IR, and interprets it. Documentation and code comments are in Portuguese; keep that convention. Commits follow Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`) with scopes like `lexer`, `parser`, `tests`, `build`, `docs`.
 
 ## Build & run
 
@@ -41,21 +41,21 @@ The C test main `tests/scanner_test_main.c` prints one `TOKEN <type> <value>` li
 Pipeline, each phase consuming the previous one's output:
 
 ```
-scanner.l (Flex) → parser.y (Bison) → AST → semantic.c → { eval_ast()  OR  ir.c (TAC) }
+scanner.l (Flex) → parser.y (Bison) → AST → semantic.c → ir.c (TAC) → ir_optimize → ir_exec
                                               symtab.c (symbol table)
 ```
 
-`main()` lives in `src/parser.y`: it calls `yyparse()` (which builds the AST), then prints the AST, runs the evaluator, prints the symbol table, and frees memory.
+`main()` lives in `src/parser.y`: it calls `yyparse()` (which builds the AST), then prints the AST, runs semantic analysis, lowers it to TAC (printed before and after optimization), executes the IR via `ir_exec()`, prints the symbol table, and frees memory.
 
 **Strict separation of parse and execute.** Bison semantic actions *only* build AST nodes — no computation, I/O, or symbol-table access happens during parsing. This is the key design invariant; preserve it when adding phases.
 
-- **`src/ast.h` / `ast.c`** — The AST is a tagged union (`ASTNode.kind` selects the active `data` member). Statements are chained via an **intrusive `next` pointer** on the struct base, so any node can be a list element (`line_list`, block `stmt_list`). Critically, `eval_ast()` evaluates a *single* node and does **not** follow `->next`; list iteration is the caller's job (`exec_list()` / the `main` loop). List building uses `append_node()` which is O(n²). Operators are encoded as `int` char codes with a mixed convention: ASCII for `+ - * / < > ! & |`, and mnemonics for the rest — `'E'`==`==`, `'N'`==`!=`, `'l'`==`<=`, `'g'`==`>=`.
+- **`src/ast.h` / `ast.c`** — The AST is a tagged union (`ASTNode.kind` selects the active `data` member). `ast.c` holds only node constructors, `print_ast()`, and `free_ast()` — **no execution** (the old AST-walking evaluator `eval_ast` was retired; the IR is the sole execution path, so don't reintroduce a second engine). Statements are chained via an **intrusive `next` pointer** on the struct base, so any node can be a list element (`line_list`, block `stmt_list`). Traversal helpers process a *single* node and do **not** follow `->next`; list iteration is the caller's job (`gen_list()` in `ir.c`, `analyze_list()` in `semantic.c`). List building uses `append_node()` which is O(n²). Operators are encoded as `int` char codes with a mixed convention: ASCII for `+ - * / < > ! & |`, and mnemonics for the rest — `'E'`==`==`, `'N'`==`!=`, `'l'`==`<=`, `'g'`==`>=`.
 
-- **Evaluator (`eval_ast` in `ast.c`)** — Every expression returns `EvalResult { double val; SymType type; }`. `double` is the universal internal type; `type` carries semantics. Note these deliberate divergences from C: single global scope (blocks don't create lexical scope), **no short-circuit** evaluation of `&&`/`||`, division-by-zero is a fatal runtime error, and declarations/assignments/free expressions auto-print results (educational convenience).
+- **Execution semantics (`ir_exec` in `ir.c`)** — Values are carried as a `double` (the universal internal type) plus a `SymType` tag. Note these deliberate divergences from C: single global scope (blocks don't create lexical scope), **no short-circuit** evaluation of `&&`/`||`, division-by-zero (int *and* float) is a fatal runtime error, and declarations/assignments/free expressions auto-print results (educational convenience). Because `ir_exec` runs the *optimized* IR, this auto-printed output already reflects constant folding and dead-code elimination.
 
 - **`src/semantic.h` / `semantic.c`** — `analyze_ast()` walks the whole tree (including all branches and loop bodies) before execution, returning error count (0 = ok). Detects undeclared use, redeclaration, literal division-by-zero; emits warnings (e.g. lossy conversions) to stderr without counting them as errors.
 
-- **`src/ir.h` / `ir.c`** — Optional lowering of the AST to **three-address code** as a flat linked list of quadruples (`IRInstr`). `gen_ir()` builds it, `ir_optimize()` runs constant folding + constant propagation + dead-code elimination to a fixed point in-place, `ir_exec()` interprets it, `ir_print()` dumps TAC. Operands (`IROperand`) embed constants directly and carry `SymType`, deliberately to keep optimizations simple.
+- **`src/ir.h` / `ir.c`** — Lowering of the AST to **three-address code** as a flat linked list of quadruples (`IRInstr`); this is the **sole execution path**. `gen_ir()` builds it, `ir_optimize()` runs constant folding + constant propagation + dead-code elimination to a fixed point in-place, `ir_exec()` interprets it, `ir_print()` dumps TAC. Operands (`IROperand`) embed constants directly and carry `SymType`, deliberately to keep optimizations simple.
 
 - **`symbol_table/symtab.h` / `symtab.c`** — Fixed-size hash table, 211 buckets, djb2 hash, external chaining, single global scope. Values stored in a `SymValue` union (`iVal` for int/bool, `fVal` for float, `cVal` for char), discriminated by the entry's `type`.
 
