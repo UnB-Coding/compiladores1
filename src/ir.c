@@ -535,6 +535,8 @@ void ir_print(const IRProgram *prog) {
  * Otimização do IR
  * ==================================================== */
 
+static void free_operand(IROperand *o);  /* definida na seção de liberação */
+
 static int is_const_opnd(IROperand o) {
     return o.kind == OPND_CONST_INT  || o.kind == OPND_CONST_FLOAT ||
            o.kind == OPND_CONST_CHAR || o.kind == OPND_CONST_BOOL;
@@ -713,6 +715,133 @@ static int ir_pass_dce(IRProgram *prog) {
     return changed;
 }
 
+/* Pass 4: Dead Temp Elimination — remove a definição de um temporário que
+ * nunca é lido. Surge tipicamente após a propagação de constantes, que
+ * substitui os usos de "tN" por uma constante e deixa "tN = ..." órfão.
+ *
+ * Só remove instruções sem efeito colateral observável (IR_COPY, IR_UNARYOP
+ * e IR_BINOP que não seja divisão): a divisão pode abortar a execução
+ * (divisão por zero / INT_MIN / -1), erro que deve ser preservado mesmo que
+ * o resultado seja descartado. O ponto-fixo de ir_optimize reexecuta o passe,
+ * de modo que cadeias de temporários mortos (t1 depende de t0) somem em
+ * iterações sucessivas. */
+static int ir_pass_dead_temp(IRProgram *prog) {
+    if (prog->temp_count == 0) return 0;
+    char *used = (char *)calloc(prog->temp_count, 1);
+    if (!used) return 0;
+
+    for (IRInstr *ins = prog->head; ins; ins = ins->next) {
+        if (ins->arg1.kind == OPND_TEMP && ins->arg1.u.temp < prog->temp_count)
+            used[ins->arg1.u.temp] = 1;
+        if (ins->arg2.kind == OPND_TEMP && ins->arg2.u.temp < prog->temp_count)
+            used[ins->arg2.u.temp] = 1;
+    }
+
+    int changed = 0;
+    IRInstr *prev = NULL;
+    IRInstr *cur  = prog->head;
+    while (cur) {
+        int removable = cur->opcode == IR_COPY    ||
+                        cur->opcode == IR_UNARYOP ||
+                        (cur->opcode == IR_BINOP && cur->op != '/');
+        if (removable &&
+            cur->dest.kind == OPND_TEMP &&
+            cur->dest.u.temp < prog->temp_count &&
+            !used[cur->dest.u.temp]) {
+            IRInstr *next = cur->next;
+            if (prev) prev->next = next;
+            else      prog->head = next;
+            if (cur == prog->tail) prog->tail = prev;
+            free_operand(&cur->dest);
+            free_operand(&cur->arg1);
+            free_operand(&cur->arg2);
+            free(cur);
+            cur = next;
+            changed = 1;
+            continue;
+        }
+        prev = cur;
+        cur  = cur->next;
+    }
+
+    free(used);
+    return changed;
+}
+
+/* Pass 5: Redundant Jump Elimination — remove "goto Lk" imediatamente seguido
+ * de "Lk:". Esse desvio inútil sobra, por exemplo, de um if(false) sem else
+ * depois que o DCE descarta o corpo morto, deixando o goto colado ao próprio
+ * rótulo de destino. */
+static int ir_pass_redundant_goto(IRProgram *prog) {
+    int changed = 0;
+    IRInstr *prev = NULL;
+    IRInstr *cur  = prog->head;
+    while (cur) {
+        if (cur->opcode == IR_GOTO &&
+            cur->arg1.kind == OPND_LABEL &&
+            cur->next &&
+            cur->next->opcode == IR_LABEL &&
+            cur->next->dest.u.label == cur->arg1.u.label) {
+            IRInstr *next = cur->next;          /* o rótulo permanece */
+            if (prev) prev->next = next;
+            else      prog->head = next;
+            /* cur->next existe, logo cur nunca é a cauda aqui */
+            free(cur);                          /* goto não tem operando-variável */
+            cur = next;
+            changed = 1;
+            continue;
+        }
+        prev = cur;
+        cur  = cur->next;
+    }
+    return changed;
+}
+
+/* Pass 6: Dead Label Elimination — remove a definição de um rótulo "Lk:" que
+ * não é alvo de nenhum desvio (goto/ifFalse). Esses rótulos órfãos sobram, por
+ * exemplo, depois que o DCE e a eliminação de desvio redundante esvaziam o
+ * corpo de um if(false)/while(false), deixando "Lk:" sem nenhuma referência. */
+static int ir_pass_dead_label(IRProgram *prog) {
+    if (prog->label_count == 0) return 0;
+    char *used = (char *)calloc(prog->label_count, 1);
+    if (!used) return 0;
+
+    for (IRInstr *ins = prog->head; ins; ins = ins->next) {
+        if (ins->opcode == IR_GOTO &&
+            ins->arg1.kind == OPND_LABEL &&
+            ins->arg1.u.label < prog->label_count)
+            used[ins->arg1.u.label] = 1;
+        if (ins->opcode == IR_IFFALSE &&
+            ins->arg2.kind == OPND_LABEL &&
+            ins->arg2.u.label < prog->label_count)
+            used[ins->arg2.u.label] = 1;
+    }
+
+    int changed = 0;
+    IRInstr *prev = NULL;
+    IRInstr *cur  = prog->head;
+    while (cur) {
+        if (cur->opcode == IR_LABEL &&
+            cur->dest.kind == OPND_LABEL &&
+            cur->dest.u.label < prog->label_count &&
+            !used[cur->dest.u.label]) {
+            IRInstr *next = cur->next;
+            if (prev) prev->next = next;
+            else      prog->head = next;
+            if (cur == prog->tail) prog->tail = prev;
+            free(cur);                          /* rótulo não tem operando-variável */
+            cur = next;
+            changed = 1;
+            continue;
+        }
+        prev = cur;
+        cur  = cur->next;
+    }
+
+    free(used);
+    return changed;
+}
+
 void ir_optimize(IRProgram *prog) {
     if (!prog) return;
     int changed;
@@ -720,6 +849,9 @@ void ir_optimize(IRProgram *prog) {
         changed  = ir_pass_const_fold(prog);
         changed |= ir_pass_const_propagate(prog);
         changed |= ir_pass_dce(prog);
+        changed |= ir_pass_dead_temp(prog);
+        changed |= ir_pass_redundant_goto(prog);
+        changed |= ir_pass_dead_label(prog);
     } while (changed);
 }
 

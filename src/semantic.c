@@ -191,9 +191,11 @@ static void check_implicit_conversion(SymType target, SymType source,
         sem_warning("conversão implícita de int para char em %s "
                     "(possível truncamento)", context);
     }
-    /* int → bool: normalização para 0/1 */
-    if (target == TYPE_BOOL && source == TYPE_FLOAT) {
-        sem_warning("conversão implícita de float para bool em %s", context);
+    /* qualquer numérico → bool: normalização para 0/1 (todo valor != 0 vira true) */
+    if (target == TYPE_BOOL &&
+        (source == TYPE_INT || source == TYPE_FLOAT || source == TYPE_CHAR)) {
+        sem_warning("conversão implícita de %s para bool em %s "
+                    "(normalização para 0/1)", sym_type_name(source), context);
     }
 }
 

@@ -140,12 +140,13 @@ class TestPropagacaoConstantesIR:
 # ---------------------------------------------------------------------------
 
 class TestDCEIR:
-    def test_if_falso_vira_goto(self, parse):
-        # if(0) → IR_IFFALSE(0) → IR_GOTO
+    def test_if_falso_colapsa(self, parse):
+        # if(0): IFFALSE(0) vira "goto Lk"; como Lk é o rótulo imediatamente
+        # seguinte, o desvio redundante também é eliminado.
         r = parse("if (0) { 99; }")
         opt = _ir_opt(r["stdout"])
-        assert "goto" in opt
         assert "ifFalse" not in opt
+        assert "goto" not in opt
 
     def test_if_falso_corpo_removido(self, parse):
         # corpo do if(0) é código morto após DCE
@@ -161,11 +162,69 @@ class TestDCEIR:
         assert "print 10" not in opt
 
     def test_while_falso_corpo_removido(self, parse):
-        # while(0) → corpo é código morto
+        # while(0) → corpo é código morto e o goto redundante some
         r = parse("while (0) { 99; }")
         opt = _ir_opt(r["stdout"])
         assert "print 99" not in opt
-        assert "goto" in opt
+        assert "ifFalse" not in opt
+
+
+# ---------------------------------------------------------------------------
+# Eliminação de Temporário Morto e Desvio Redundante
+# ---------------------------------------------------------------------------
+
+class TestDeadTempIR:
+    def test_temp_morto_removido(self, parse):
+        # int z = 1 - 1: t0 = 0 é propagado para z = 0; t0 fica órfão e some.
+        r = parse("int z = 1 - 1;")
+        opt = _ir_opt(r["stdout"])
+        assert "z = 0" in opt
+        assert "t0" not in opt
+
+    def test_temp_morto_em_expr_stmt(self, parse):
+        # 2 + 3 * 4: ambos os temporários são propagados para o print e somem.
+        r = parse("2 + 3 * 4;")
+        opt = _ir_opt(r["stdout"])
+        assert "print 14" in opt
+        assert "t0" not in opt
+        assert "t1" not in opt
+
+    def test_temp_vivo_preservado(self, parse):
+        # a + 4 não pode foldar; o temporário continua sendo lido e permanece.
+        r = parse("int a = 3; int x = a + 4;")
+        opt = _ir_opt(r["stdout"])
+        assert "t0 = a + 4" in opt
+        assert "x = t0" in opt
+
+
+class TestRedundantGotoIR:
+    def test_goto_para_rotulo_seguinte_removido(self, parse):
+        # if(0) sem else: após o DCE sobra "goto Lk" colado a "Lk:".
+        r = parse("if (0) { 99; }")
+        opt = _ir_opt(r["stdout"])
+        assert "goto" not in opt
+
+
+class TestDeadLabelIR:
+    def test_rotulo_orfao_removido(self, parse):
+        # if(0): corpo, ifFalse, goto e o rótulo órfão somem — IR vazia.
+        r = parse("if (0) { 99; }")
+        opt = _ir_opt(r["stdout"])
+        assert "L0:" not in opt
+        assert "IR vazia" in opt
+
+    def test_while_falso_colapsa_totalmente(self, parse):
+        r = parse("while (0) { 99; }")
+        opt = _ir_opt(r["stdout"])
+        assert "L0:" not in opt
+        assert "L1:" not in opt
+
+    def test_rotulo_vivo_preservado(self, parse):
+        # if com condição variável: o rótulo é alvo do ifFalse e permanece.
+        r = parse("int x = 1; if (x > 0) { x = 2; }")
+        opt = _ir_opt(r["stdout"])
+        assert "ifFalse" in opt
+        assert "L0:" in opt
 
 
 # ---------------------------------------------------------------------------
