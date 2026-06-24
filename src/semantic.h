@@ -7,7 +7,7 @@
  Descrição: Análise Semântica da AST
 
  A análise semântica é executada APÓS o parsing e ANTES
- da execução (eval_ast). Percorre a AST inteira — incluindo
+ da geração de IR e da execução. Percorre a AST inteira — incluindo
  todos os branches de if/else e corpos de loops — para
  detectar erros estáticos como:
    - Uso de variável não declarada

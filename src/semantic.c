@@ -12,7 +12,7 @@
  declaradas e seus tipos, sem alterar a tabela de
  símbolos real (symtab.c).
 
- Diferença fundamental vs eval_ast():
+ Diferença fundamental vs a execução (ir_exec):
    - Analisa TODOS os branches (then + else, corpo de loops)
    - NÃO executa: não calcula valores, não faz I/O
    - Detecta erros em dead code

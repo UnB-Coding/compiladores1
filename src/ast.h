@@ -8,8 +8,8 @@
 
  A AST separa completamente a fase de análise (parsing)
  da fase de execução. O Bison constrói a árvore durante
- o parsing; após o parsing, eval_ast() percorre a árvore
- e executa o programa.
+ o parsing; após a análise semântica, a AST é traduzida
+ para código intermediário (ir.c) e executada por ir_exec().
  ******************************************************/
 
 #ifndef AST_H
@@ -47,14 +47,6 @@ typedef enum {
     /* Estrutural */
     AST_BLOCK       /* bloco { stmt_list }                */
 } NodeType;
-
-/* ====================================================
- * Resultado tipado da avaliação de uma expressão
- * ==================================================== */
-typedef struct {
-    double  val;    /* valor numérico (double para uniformidade) */
-    SymType type;   /* tipo semântico do resultado              */
-} EvalResult;
 
 /* ====================================================
  * Nó da AST
@@ -171,11 +163,6 @@ ASTNode *new_for_node(ASTNode *init, ASTNode *cond, ASTNode *step,
 
 /* Estrutural */
 ASTNode *new_block_node(ASTNode *stmts);
-
-/* ====================================================
- * Avaliador: percorre a AST e executa o programa
- * ==================================================== */
-EvalResult eval_ast(ASTNode *node);
 
 /* ====================================================
  * Impressão visual: exibe a AST com indentação

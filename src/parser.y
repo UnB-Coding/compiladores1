@@ -10,7 +10,8 @@ As ações semânticas APENAS constroem nós da AST.
 Nenhuma execução (cálculos, Tabela de Símbolos, I/O)
 ocorre durante o parsing. Após a construção da AST,
 a análise semântica (analyze_ast) verifica erros
-estáticos. Só depois a execução ocorre em eval_ast().
+estáticos. Só depois a AST é traduzida para IR (gen_ir)
+e executada por ir_exec().
 ******************************************************/
 
 %{

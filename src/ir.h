@@ -6,9 +6,9 @@
  Arquivo: ir.h
  Descrição: Geração de Código Intermediário (TAC)
 
- Esta fase é executada APÓS a análise semântica e ANTES
- (ou no lugar) da execução por eval_ast(). Percorre a AST
- e produz uma Representação Intermediária (IR) na forma de
+ Esta fase é executada APÓS a análise semântica e produz
+ a representação que será executada por ir_exec(). Percorre
+ a AST e produz uma Representação Intermediária (IR) na forma de
  Código de Três Endereços (Three-Address Code, TAC):
 
      t0 = a + b
