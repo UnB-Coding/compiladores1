@@ -12,13 +12,6 @@ BUILD_DIR = ROOT / "build"
 _EXE = ".exe" if sys.platform == "win32" else ""
 
 # ---------------------------------------------------------------------------
-# Caminhos — lexer standalone
-# ---------------------------------------------------------------------------
-LEXER_TEST_BIN = BUILD_DIR / f"lexer_test_exe{_EXE}"
-LEXER_YY_C = BUILD_DIR / "lexer.yy.c"
-LEXER_TEST_MAIN = ROOT / "tests" / "lexer_test_main.c"
-
-# ---------------------------------------------------------------------------
 # Caminhos — scanner + parser
 # ---------------------------------------------------------------------------
 SCANNER_TEST_BIN = BUILD_DIR / f"scanner_test_exe{_EXE}"
@@ -45,38 +38,6 @@ def _find_tool(name: str) -> str:
         if Path(candidate).exists():
             return candidate
     return name  # deixa o subprocess falhar com mensagem clara
-
-
-# ---------------------------------------------------------------------------
-# Build — lexer standalone
-# ---------------------------------------------------------------------------
-
-def _build_lexer_yy_c():
-    if LEXER_YY_C.exists():
-        return
-    flex = _find_tool("flex")
-    r = subprocess.run(
-        [flex, "-o", str(LEXER_YY_C), str(ROOT / "examples" / "lexer.l")],
-        cwd=ROOT, capture_output=True, text=True,
-    )
-    if r.returncode != 0:
-        raise RuntimeError(f"flex (lexer.l) falhou:\n{r.stderr}")
-
-
-def _build_lexer_test_bin():
-    gcc = _find_tool("gcc")
-    r = subprocess.run(
-        [
-            gcc,
-            f"-I{ROOT}", f"-I{ROOT / 'src'}", f"-I{ROOT / 'symbol_table'}",
-            "-o", str(LEXER_TEST_BIN),
-            str(LEXER_YY_C),
-            str(LEXER_TEST_MAIN),
-        ],
-        cwd=ROOT, capture_output=True, text=True,
-    )
-    if r.returncode != 0:
-        raise RuntimeError(f"Falha ao compilar lexer_test_exe:\n{r.stderr}")
 
 
 # ---------------------------------------------------------------------------
@@ -152,13 +113,6 @@ def _build_parser_exe():
 # Fixtures de sessão — build
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="session", autouse=True)
-def build_lexer_test():
-    """Compila lexer_test_exe (usado pelos testes do lexer standalone)."""
-    _build_lexer_yy_c()
-    _build_lexer_test_bin()
-
-
 @pytest.fixture(scope="session")
 def build_scanner_test():
     """Compila scanner_test_exe e parser_exe (usados pelos testes de scanner/parser)."""
@@ -171,26 +125,6 @@ def build_scanner_test():
 # ---------------------------------------------------------------------------
 # Fixtures de execução
 # ---------------------------------------------------------------------------
-
-@pytest.fixture
-def lex():
-    """Tokeniza via lexer standalone (tokens: KW_INT, IDENTIFIER, OP_PLUS…)."""
-    def run(source: str) -> list[dict]:
-        proc = subprocess.run(
-            [str(LEXER_TEST_BIN)],
-            input=source, capture_output=True, text=True,
-        )
-        tokens = []
-        for line in proc.stdout.splitlines():
-            if line.startswith("TOKEN "):
-                parts = line.split(" ", 2)
-                tokens.append({
-                    "type":  parts[1],
-                    "value": parts[2] if len(parts) > 2 else "",
-                })
-        return tokens
-    return run
-
 
 @pytest.fixture
 def scan(build_scanner_test):

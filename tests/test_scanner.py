@@ -1,8 +1,6 @@
 """Testes do scanner (scanner.l) — tokens usados pelo parser Bison.
 
-Os nomes de token diferem do lexer standalone:
-  scanner.l  →  T_INT, ID, PLUS, EQ, ...
-  lexer.l    →  KW_INT, IDENTIFIER, OP_PLUS, OP_EQ, ...
+Exemplos de nomes de token: T_INT, ID, PLUS, EQ, ...
 """
 
 import pytest
