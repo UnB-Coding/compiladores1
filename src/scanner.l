@@ -15,6 +15,8 @@ delimitadores de bloco.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 #include "parser.tab.h"  /* contém definições geradas pelo Bison (NUM, PLUS, etc.) */
 
 /* Conta caracteres não reconhecidos durante a varredura.
@@ -26,12 +28,27 @@ int lexical_errors = 0;
 
  /* Literais de ponto flutuante (antes de inteiros para maximal munch) */
 [0-9]+\.[0-9]*|\.[0-9]+  {
-    yylval.floatValue = atof(yytext);
+    errno = 0;
+    double v = strtod(yytext, NULL);
+    if (errno == ERANGE) {
+        fprintf(stderr,
+                "Aviso: literal de ponto flutuante fora de faixa: %s\n",
+                yytext);
+    }
+    yylval.floatValue = v;
     return FLOAT_LIT;
 }
 
 [0-9]+  {
-    yylval.intValue = atoi(yytext);
+    errno = 0;
+    long v = strtol(yytext, NULL, 10);
+    if (errno == ERANGE || v > INT_MAX) {
+        fprintf(stderr,
+                "Aviso: literal inteiro fora de faixa (máx %d): %s\n",
+                INT_MAX, yytext);
+        v = INT_MAX;
+    }
+    yylval.intValue = (int)v;
     return NUM;
 }
 
