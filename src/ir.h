@@ -78,7 +78,9 @@ typedef enum {
     IR_IFFALSE,  /* ifFalse x goto Lk    — desvia se x == 0         */
     IR_COPY,     /* x = y                — cópia/atribuição         */
     IR_BINOP,    /* x = y <op> z         — operação binária         */
-    IR_UNARYOP   /* x = <op> y           — operação unária          */
+    IR_UNARYOP,  /* x = <op> y           — operação unária          */
+    IR_DECL,     /* decl x : T           — declaração; dest=var, op=has_init */
+    IR_PRINT     /* print x              — imprime resultado de expr_stmt    */
 } IROpcode;
 
 /* ====================================================
@@ -127,5 +129,19 @@ void ir_print(const IRProgram *prog);
  * ir_free: libera toda a memória do programa IR.
  * ==================================================== */
 void ir_free(IRProgram *prog);
+
+/* ====================================================
+ * ir_optimize: otimiza a IR in-place.
+ * Executa constant folding, propagação de constantes e
+ * eliminação de código morto em loop de ponto fixo.
+ * ==================================================== */
+void ir_optimize(IRProgram *prog);
+
+/* ====================================================
+ * ir_exec: executa o programa IR diretamente.
+ * Lineariza a lista, constrói mapa de rótulos e
+ * interpreta cada instrução com um ponteiro de instrução.
+ * ==================================================== */
+void ir_exec(IRProgram *prog);
 
 #endif /* IR_H */

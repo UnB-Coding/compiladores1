@@ -264,23 +264,22 @@ int main(int argc, char **argv) {
         }
 
         /* Fase 3: Geração de código intermediário (TAC).
-         * Percorre a AST e produz uma representação linear,
-         * independente de máquina, que serve de base para
-         * futuras otimizações e geração de código final. */
+         * Percorre a AST e produz uma representação linear. */
         printf("=== Código Intermediário (TAC) ===\n");
         IRProgram *ir = gen_ir(ast_root);
         ir_print(ir);
-        ir_free(ir);
         printf("==================================\n\n");
 
-        /* Fase 4: percorrer a AST e executar o programa. */
-        EvalResult last = { 0.0, TYPE_INT };
-        ASTNode *cur = ast_root;
-        while (cur) {
-            last = eval_ast(cur);
-            cur = cur->next;
-        }
-        (void)last;  /* suprime aviso de variável não usada */
+        /* Fase 4: Otimização do IR.
+         * Constant folding, propagação de constantes e DCE. */
+        printf("=== IR Otimizado ===\n");
+        ir_optimize(ir);
+        ir_print(ir);
+        printf("====================\n\n");
+
+        /* Fase 5: Execução via IR. */
+        ir_exec(ir);
+        ir_free(ir);
 
         /* Imprime a tabela de símbolos final */
         sym_print();
