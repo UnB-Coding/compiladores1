@@ -1,6 +1,6 @@
 # Front-end: Analisador Sintático (Parser) e AST
 
-O analisador sintático processa o fluxo de tokens fornecido pelo scanner, valida se o código-fonte obedece às regras gramaticais e constrói a **Árvore Sintática Abstrata (AST)**, que serve de base para o motor semântico e a execução.
+O analisador sintático processa o fluxo de tokens fornecido pelo scanner, valida se o código-fonte obedece às regras gramaticais e constrói a **Árvore Sintática Abstrata (AST)**, que serve de base para a análise semântica, geração de código intermediário e execução.
 
 A sintaxe é processada por um analisador **LALR(1)** gerado pelo **Bison** a partir do arquivo [parser.y](../src/parser.y). A estrutura da AST e as rotinas de manipulação de nós estão em [ast.h](../src/ast.h) e [ast.c](../src/ast.c).
 
@@ -8,7 +8,7 @@ A sintaxe é processada por um analisador **LALR(1)** gerado pelo **Bison** a pa
 
 ## 1. O que CONSEGUIMOS Fazer (Funcionalidades Sintáticas e AST)
 
-O analisador sintático e o interpretador AST oferecem suporte completo às seguintes regras estruturais:
+O analisador sintático oferece suporte completo às seguintes regras estruturais:
 
 ### 1.1 Regras de Gramática Suportadas
 * **Declaração de Variáveis:** Aceita declarações explícitas de tipos (`int`, `float`, `char`, `bool`) seguidas do identificador e finalizadas por ponto e vírgula. Aceita inicialização opcional na própria declaração (ex: `float pi = 3.14;`).
@@ -47,7 +47,7 @@ A AST separa a fase de análise da execução. O arquivo [ast.h](../src/ast.h) d
 | **Op. Binária** | `AST_BINOP` | Operador (`op`) e ponteiros para os nós `left` e `right`. |
 | **Op. Unária** | `AST_UNARYOP` | Operador (`op`) e ponteiro para o nó de operando (`operand`). |
 | **Atribuição** | `AST_ASSIGN` | Nome do identificador (`name`) e nó com a expressão (`expr`). |
-| **Declaração** | `AST_DECL` | Tipo declared (`type`), nome (`name`) e nó de inicialização (`init`). |
+| **Declaração** | `AST_DECL` | Tipo declarado (`type`), nome (`name`) e nó de inicialização (`init`). |
 | **Comando Expr** | `AST_EXPR_STMT` | Nó contendo a expressão correspondente (`expr`). |
 | **Condicional** | `AST_IF` | Nós para a condição (`cond`), ramo verdadeiro (`then_branch`) e falso (`else_branch`). |
 | **Repetição While** | `AST_WHILE` | Nós para a condição (`cond`) e o corpo do laço (`body`). |
@@ -56,10 +56,15 @@ A AST separa a fase de análise da execução. O arquivo [ast.h](../src/ast.h) d
 
 * **Estrutura Encadeada:** A struct `ASTNode` possui o campo `struct ASTNode *next`, que permite encadear sequencialmente comandos no mesmo escopo (como listas de instruções de um programa ou corpo de blocos) de forma simples e direta, sem exigir nós coletores adicionais na AST.
 
-### 1.4 Rotinas de Execução e Gerenciamento
-* **Tree-Walker Evaluator:** A execução do programa é feita percorrendo a AST de maneira recursiva através da função `eval_ast(ASTNode *node)`. Expressões retornam um tipo estruturado `EvalResult` contendo o valor numérico unificado em um campo `double` e o tipo semântico correspondente (`SymType`), de modo a detectar inconsistências em tempo de execução.
-* **Impressão Visual da AST:** A função `print_ast(ASTNode *node, int level)` percorre a árvore e a exibe no terminal de forma recuada, facilitando a depuração sintática estrutural de qualquer programa fonte C de entrada.
-* **Liberação de Memória:** O interpretador faz o gerenciamento dinâmico estrito de memória. A função `free_ast(ASTNode *node)` percorre recursivamente a árvore em pós-ordem, liberando strings duplicadas via `strdup()` em identificadores e declarações, e depois desaloca o próprio nó, eliminando vazamentos de memória.
+### 1.4 Separação entre Parsing e Execução
+As ações semânticas do Bison **apenas constroem nós da AST** — nenhum cálculo, I/O ou manipulação da tabela de símbolos ocorre durante o parsing. Após a construção da AST, as fases subsequentes processam a árvore:
+
+1. **Impressão Visual da AST:** A função `print_ast(ASTNode *node, int level)` percorre a árvore e a exibe no terminal de forma recuada, facilitando a depuração sintática estrutural de qualquer programa fonte C de entrada.
+2. **Análise Semântica:** A função `analyze_ast()` (em `semantic.c`) percorre a AST inteira — incluindo dead code — para detectar erros estáticos antes da execução.
+3. **Geração de IR:** A função `gen_ir()` (em `ir.c`) traduz a AST para Código de Três Endereços (TAC).
+4. **Otimização:** A função `ir_optimize()` aplica 6 passes de otimização sobre o IR.
+5. **Execução:** A função `ir_exec()` interpreta o IR otimizado.
+6. **Liberação de Memória:** A função `free_ast(ASTNode *node)` percorre recursivamente a árvore em pós-ordem, liberando strings duplicadas via `strdup()` em identificadores e declarações, e depois desaloca o próprio nó, eliminando vazamentos de memória.
 
 ---
 

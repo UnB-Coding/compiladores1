@@ -23,11 +23,11 @@ Nosso analisador léxico está totalmente funcional e suporta os seguintes eleme
 * `for` (retorna `KW_FOR`)
 
 ### 1.3 Literais e Valores Especiais
-* **Literais Inteiros:** Cadeias de dígitos numéricos (ex: `123`), capturados pela regex `[0-9]+` e convertidos via `atoi()`. Retorna o valor numérico em `yylval.intValue`.
-* **Literais de Ponto Flutuante:** Números decimais (ex: `3.14`, `.5`, `2.`), capturados pela regex `[0-9]+\.[0-9]*|\.[0-9]+` e convertidos via `atof()`. Retorna o valor em `yylval.floatValue`.
+* **Literais Inteiros:** Cadeias de dígitos numéricos (ex: `123`), capturados pela regex `[0-9]+` e convertidos via `strtol()` com verificação de overflow contra `ERANGE` e `INT_MAX`. Retorna o valor numérico em `yylval.intValue`.
+* **Literais de Ponto Flutuante:** Números decimais (ex: `3.14`, `.5`, `2.`), capturados pela regex `[0-9]+\.[0-9]*|\.[0-9]+` e convertidos via `strtod()` com verificação de overflow (`errno == ERANGE`). Retorna o valor em `yylval.floatValue`.
 * **Literais Booleans:** Reconhece `true` (retorna `TRUE_LIT` com `yylval.intValue = 1`) e `false` (retorna `FALSE_LIT` com `yylval.intValue = 0`).
-* **Literais de Caractere (Simples):** Caractere único delimitado por aspas simples (ex: `'A'`). A regex `'[^\\']'` captura o caractere na posição `yytext[1]` e retorna em `yylval.charValue`.
-* **Sequências de Escape em Caracteres:** Trata escapes clássicos da linguagem C através da regra `'\\.'` e mapeamento interno via `switch-case`:
+* **Literais de Caractere (Simples):** Caractere único delimitado por aspas simples (ex: `'A'`). A regex `'[^\\\\']'` captura o caractere na posição `yytext[1]` e retorna em `yylval.charValue`.
+* **Sequências de Escape em Caracteres:** Trata escapes clássicos da linguagem C através da regra `'\\\\.'` e mapeamento interno via `switch-case`:
   - `\n` (quebra de linha)
   - `\t` (tabulação)
   - `\r` (retorno de carro)
@@ -48,6 +48,10 @@ Nosso analisador léxico está totalmente funcional e suporta os seguintes eleme
 * **Lógicos:** `&&` (`AND`), `||` (`OR`), `!` (`NOT`).
 * **Pontuação/Estruturais:** `(` (`LPAREN`), `)` (`RPAREN`), `{` (`LBRACE`), `}` (`RBRACE`), `;` (`SEMICOLON`).
 
+### 1.6 Tratamento de Erros Léxicos
+* Caracteres não reconhecidos são reportados em `stderr` via `fprintf(stderr, "Erro léxico: caractere não reconhecido: %s\n", yytext)`.
+* O scanner mantém um contador global `lexical_errors`. Se ao final do parsing houver erros léxicos, o `main()` recusa a execução e retorna com código de falha (`EXIT_FAILURE`).
+
 ---
 
 ## 2. O que NÃO CONSEGUIMOS Fazer (Limitações do Lexer)
@@ -61,7 +65,6 @@ Para simplificar o escopo da disciplina e focar no motor do interpretador, o ana
 * **Comentários:** O analisador léxico atual não possui regras para filtrar ou ignorar comentários de linha (`//`) ou de bloco (`/* ... */`).
 * **Diretivas do Pré-processador:** Diretivas iniciadas com `#` (ex: `#include`, `#define`) não são suportadas.
 * **Operadores Avançados:** Operadores de ponteiro (`&`, `*`), atribuição composta (`+=`, `-=`, `*=`, `/=`), incremento/decremento (`++`, `--`), deslocamento (`<<`, `>>`) ou acesso a membros (`.`, `->`) não são reconhecidos.
-* **Erros Léxicos:** Caracteres que não casam com nenhuma das regras (ex: `@`, `$`, `?`) são reportados na saída padrão (`printf("Caractere não reconhecido...")`), mas não interrompem o analisador de imediato, repassando um token desconhecido.
 
 ---
 
@@ -71,11 +74,11 @@ A comunicação do Lexer com o Parser é feita através da variável global `yyl
 
 ```c
 %union {
-    int    intValue;    /* Usado por NUM, TRUE_LIT, FALSE_LIT */
-    double floatValue;  /* Usado por FLOAT_LIT */
-    char   charValue;   /* Usado por CHAR_LIT */
-    char  *strValue;    /* Usado por ID */
-    struct ASTNode *node;
+    int    intValue;           /* Usado por NUM, TRUE_LIT, FALSE_LIT, type_spec */
+    double floatValue;         /* Usado por FLOAT_LIT */
+    char   charValue;          /* Usado por CHAR_LIT */
+    char  *strValue;           /* Usado por ID */
+    struct ASTNode *node;      /* Usado por não-terminais que produzem nós AST */
 }
 ```
 

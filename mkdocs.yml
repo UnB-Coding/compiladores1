@@ -29,15 +29,17 @@ theme:
 nav:
   - Início: index.md
   - Interpretador:
-    - Como Executar: como_executar.md
-    - Analisador Léxico (Flex): lexer.md
-    - Analisador Sintático (Bison): parser.md
-    - Tabela de Símbolos e Tipagem: guia_gramatica.md
-    - Explicação dos Arquivos: explicacao_arquivos.md
-    - Testes e Qualidade: tests.md
+      - Como Executar: como_executar.md
+      - Arquitetura Geral: arquitetura_interpretador.md
+      - Analisador Léxico (Flex): lexer.md
+      - Analisador Sintático (Bison): parser.md
+      - Código Intermediário e Otimização: codigo_intermediario.md
+      - Tabela de Símbolos e Tipagem: guia_gramatica.md
+      - Explicação dos Arquivos: explicacao_arquivos.md
+      - Testes e Qualidade: tests.md
   - Contribuição: contributing.md
   - Relatórios:
-    - Sprints e Evolução: sprints.md
+      - Sprints e Evolução: sprints.md
 
 markdown_extensions:
   - admonition
