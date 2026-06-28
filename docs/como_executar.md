@@ -1,6 +1,6 @@
 # Como executar o projeto
 
-Este projeto utiliza um `Makefile` para automatizar a geração e compilação de analisadores léxicos e sintáticos usando **Flex**, **Bison** e **GCC**. 
+Este projeto utiliza um `Makefile` para automatizar a geração e compilação do interpretador usando **Flex**, **Bison** e **GCC**. 
 
 Como você pode estar utilizando Windows, precisará de um ambiente que suporte essas ferramentas (como WSL, MSYS2 ou MinGW) ou rodar tudo através de um terminal configurado com elas.
 
@@ -20,27 +20,31 @@ Abra o seu terminal na pasta raiz do projeto (onde está o `Makefile`) e execute
 make
 ```
 
-Isso executará a regra padrão (`all`), que vai gerar os arquivos `.c` a partir do Flex e do Bison e compilará **um único executável** dentro da pasta `build/`:
-- `parser_exe`: o interpretador completo (léxico → sintático → semântico → IR → execução).
+Isso executará a regra padrão (`all`), que vai gerar os arquivos `.c` a partir do Flex e do Bison e compilará o executável dentro da pasta `build/`:
+- `parser_exe`: O interpretador principal.
 
 *(Nota: O Makefile cria a pasta `build/` automaticamente; caso o compilador acuse erro de pasta não encontrada, crie-a com `mkdir build`.)*
 
 ## 3. Como executar
 
-Após a compilação, o executável estará em `build/parser_exe`. Ele lê o código-fonte da **entrada padrão** (`stdin`) — ou de um arquivo passado como argumento — e imprime a AST, o TAC (antes e depois da otimização), a saída do programa e a tabela de símbolos final.
+Após a compilação, o executável estará na pasta `build`. Para executar o interpretador, passe um arquivo de código-fonte C como argumento:
 
-**Passando o código por `stdin`:**
 ```bash
-echo 'int x = 1 + 2;' | ./build/parser_exe
+./build/parser_exe caminho/para/arquivo.c
 ```
 
-**Lendo de um arquivo:**
+Por exemplo, usando o arquivo de teste de otimização incluso:
 ```bash
-./build/parser_exe arquivo_de_teste.c
-# ou, redirecionando a entrada:
-./build/parser_exe < arquivo_de_teste.c
+./build/parser_exe examples/teste_otimizacao.c
 ```
-*(No PowerShell: `Get-Content arquivo_de_teste.c | ./build/parser_exe.exe`)*
+
+O interpretador irá:
+1. Imprimir a **AST Gerada** (árvore sintática abstrata).
+2. Executar a **análise semântica** (reportando erros ou avisos).
+3. Imprimir o **Código Intermediário (TAC)** original.
+4. Imprimir o **IR Otimizado** (após as passes de otimização).
+5. **Executar** o programa e exibir os valores declarados/atribuídos.
+6. Imprimir a **Tabela de Símbolos** final.
 
 ## 4. Como limpar os arquivos gerados
 
@@ -49,3 +53,14 @@ Caso queira apagar os executáveis e os códigos em C gerados automaticamente pe
 ```bash
 make clean
 ```
+
+## 5. Como rodar os testes
+
+Para executar a suíte automatizada de testes com `pytest`:
+
+```bash
+pip install -r requirements-test.txt
+pytest
+```
+
+Os testes compilam o binário automaticamente via fixture e validam scanner, parser, geração de IR e otimizações.
