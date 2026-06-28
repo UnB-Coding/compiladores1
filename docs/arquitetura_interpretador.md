@@ -37,7 +37,7 @@ O interpretador opera em um pipeline de **cinco fases sequenciais**, onde a saí
 
 **Fluxo de execução do `main()` (em `parser.y`):**
 
-1. O Bison invoca `yyparse()`, que chama `yylex()` repetidamente para obter tokens.
+1. O Bison invoca `yyparse()`, que chama `yylex()` repetidamente para obter tokens. Erros léxicos (caracteres não reconhecidos) abortam a execução antes de qualquer fase posterior.
 2. As ações semânticas do parser **apenas constroem nós da AST** — nenhum cálculo, I/O ou manipulação da tabela de símbolos ocorre nesta fase.
 3. Após o parsing bem-sucedido, `ast_root` aponta para a raiz da AST.
 4. A AST é impressa para depuração (`print_ast`).

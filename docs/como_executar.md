@@ -23,7 +23,7 @@ make
 Isso executará a regra padrão (`all`), que vai gerar os arquivos `.c` a partir do Flex e do Bison e compilará o executável dentro da pasta `build/`:
 - `parser_exe`: O interpretador principal.
 
-*(Nota: O Makefile utiliza a pasta `build/`, então certifique-se de que ela existe na raiz do projeto usando `mkdir build` caso o compilador acuse algum erro de pasta não encontrada).*
+*(Nota: O Makefile cria a pasta `build/` automaticamente; caso o compilador acuse erro de pasta não encontrada, crie-a com `mkdir build`.)*
 
 ## 3. Como executar
 
