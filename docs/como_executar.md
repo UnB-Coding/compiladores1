@@ -20,25 +20,25 @@ Abra o seu terminal na pasta raiz do projeto (onde está o `Makefile`) e execute
 make
 ```
 
-Isso executará a regra padrão (`all`), que vai gerar os arquivos `.c` a partir do Flex e do Bison e compilará dois executáveis dentro da pasta `build/`:
-- `lexer_exe`: Analisador léxico standalone.
-- `parser_exe`: Parser de exemplo.
+Isso executará a regra padrão (`all`), que vai gerar os arquivos `.c` a partir do Flex e do Bison e compilará **um único executável** dentro da pasta `build/`:
+- `parser_exe`: o interpretador completo (léxico → sintático → semântico → IR → execução).
 
-*(Nota: O Makefile utiliza a pasta `build/`, então certifique-se de que ela existe na raiz do projeto usando `mkdir build` caso o compilador acuse algum erro de pasta não encontrada).*
+*(Nota: O Makefile cria a pasta `build/` automaticamente; caso o compilador acuse erro de pasta não encontrada, crie-a com `mkdir build`.)*
 
 ## 3. Como executar
 
-Após a compilação, os executáveis estarão na pasta `build`. Para rodá-los no terminal, você pode passar um arquivo de código-fonte como entrada:
+Após a compilação, o executável estará em `build/parser_exe`. Ele lê o código-fonte da **entrada padrão** (`stdin`) — ou de um arquivo passado como argumento — e imprime a AST, o TAC (antes e depois da otimização), a saída do programa e a tabela de símbolos final.
 
-**Para executar o Analisador Léxico (Lexer):**
+**Passando o código por `stdin`:**
 ```bash
-./build/lexer_exe 
+echo 'int x = 1 + 2;' | ./build/parser_exe
 ```
-*(No PowerShell: `Get-Content arquivo_de_teste.c | ./build/lexer_exe.exe`)*
 
-**Para executar o Parser (Analisador Sintático):**
+**Lendo de um arquivo:**
 ```bash
-./build/parser_exe 
+./build/parser_exe arquivo_de_teste.c
+# ou, redirecionando a entrada:
+./build/parser_exe < arquivo_de_teste.c
 ```
 *(No PowerShell: `Get-Content arquivo_de_teste.c | ./build/parser_exe.exe`)*
 

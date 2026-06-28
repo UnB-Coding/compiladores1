@@ -8,7 +8,7 @@ A sintaxe é processada por um analisador **LALR(1)** gerado pelo **Bison** a pa
 
 ## 1. O que CONSEGUIMOS Fazer (Funcionalidades Sintáticas e AST)
 
-O analisador sintático e o interpretador AST oferecem suporte completo às seguintes regras estruturais:
+O analisador sintático oferece suporte completo às seguintes regras estruturais (lembrando que ele **apenas constrói a AST** — a execução acontece em fases posteriores):
 
 ### 1.1 Regras de Gramática Suportadas
 * **Declaração de Variáveis:** Aceita declarações explícitas de tipos (`int`, `float`, `char`, `bool`) seguidas do identificador e finalizadas por ponto e vírgula. Aceita inicialização opcional na própria declaração (ex: `float pi = 3.14;`).
@@ -56,8 +56,8 @@ A AST separa a fase de análise da execução. O arquivo [ast.h](../src/ast.h) d
 
 * **Estrutura Encadeada:** A struct `ASTNode` possui o campo `struct ASTNode *next`, que permite encadear sequencialmente comandos no mesmo escopo (como listas de instruções de um programa ou corpo de blocos) de forma simples e direta, sem exigir nós coletores adicionais na AST.
 
-### 1.4 Rotinas de Execução e Gerenciamento
-* **Tree-Walker Evaluator:** A execução do programa é feita percorrendo a AST de maneira recursiva através da função `eval_ast(ASTNode *node)`. Expressões retornam um tipo estruturado `EvalResult` contendo o valor numérico unificado em um campo `double` e o tipo semântico correspondente (`SymType`), de modo a detectar inconsistências em tempo de execução.
+### 1.4 Rotinas da AST e Gerenciamento
+* **A AST não é executada diretamente:** o `ast.c` contém **apenas** construtores de nós, `print_ast()` e `free_ast()`. A execução do programa **não** percorre a AST — ela é traduzida para Código de Três Endereços por `gen_ir()` e interpretada por `ir_exec()` (ver [Código Intermediário](codigo_intermediario.md)). O antigo avaliador *tree-walking* `eval_ast()` (e seu tipo `EvalResult`) foi **aposentado**.
 * **Impressão Visual da AST:** A função `print_ast(ASTNode *node, int level)` percorre a árvore e a exibe no terminal de forma recuada, facilitando a depuração sintática estrutural de qualquer programa fonte C de entrada.
 * **Liberação de Memória:** O interpretador faz o gerenciamento dinâmico estrito de memória. A função `free_ast(ASTNode *node)` percorre recursivamente a árvore em pós-ordem, liberando strings duplicadas via `strdup()` em identificadores e declarações, e depois desaloca o próprio nó, eliminando vazamentos de memória.
 

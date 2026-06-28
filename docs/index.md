@@ -2,7 +2,7 @@
 
 Documentação técnica do projeto da **Equipe 15** desenvolvido para a disciplina de **Compiladores 1** da Universidade de Brasília (UnB). 
 
-Desenvolvemos um interpretador completo de um subconjunto estruturado da linguagem C. O interpretador realiza análise léxica e sintática (com construção de AST), validação semântica com verificação e coerção de tipos, otimização da árvore sintática (como dobramento de constantes e eliminação de código morto), geração de código intermediário linear (TAC) e execução do código por meio de uma Máquina Virtual interna.
+Desenvolvemos um interpretador completo de um subconjunto estruturado da linguagem C. O interpretador realiza análise léxica e sintática (com construção de AST), validação semântica com verificação e coerção de tipos, geração de código intermediário linear (TAC), otimização desse código intermediário (dobramento e propagação de constantes, eliminação de código morto) e execução direta da IR otimizada.
 
 ---
 
@@ -19,7 +19,7 @@ Desenvolvemos um interpretador completo de um subconjunto estruturado da linguag
 
 * **[Evolução do Projeto e Sprints](sprints.md):** Histórico de desenvolvimento (Sprints 1 a 8) utilizando Scrum e a experiência com a prática de Pair Programming.
 * **[Analisador Léxico (Flex)](lexer.md):** Regras de expressões regulares, mapeamento de keywords, tratamento de sequências de escape em caracteres e limitações léxicas.
-* **[Analisador Sintático e AST](parser.md):** Integração Flex-Bison, resolução de precedências de operadores, estrutura de 14 nós da AST, caminhada da árvore (*tree-walker*) e liberação de memória.
+* **[Analisador Sintático e AST](parser.md):** Integração Flex-Bison, resolução de precedências de operadores, estrutura de 14 nós da AST, construção da árvore (somente parsing, sem execução) e liberação de memória.
 * **[Tabela de Símbolos e Tipagem](guia_gramatica.md):** Funcionamento do algoritmo de hash `djb2`, buckets para tratamento de colisões e regras de coerção e promoção implícitas.
 * **[Qualidade, Testes e Automação](tests.md):** Estruturação da suíte com mais de 150 testes em `pytest`, fixture de build e relatórios de cobertura com `pytest-cov`.
 * **[Como Executar](como_executar.md):** Instruções e pré-requisitos para compilar e testar o interpretador localmente.
@@ -39,9 +39,9 @@ O interpretador aceita e processa com sucesso um código C que contenha:
 * Controle de fluxo estruturado: desvios condicionais `if` e `if/else`, e laços iterativos `while` e `for`.
 * Blocos aninhados de instruções contidos entre chaves `{ ... }`.
 * Geração de código intermediário linear no formato de Código de Três Endereços (TAC).
-* Otimizações locais da AST (como dobramento de constantes e eliminação de código morto).
-* Execução do código por meio de uma Máquina Virtual baseada em interpretador direto de TAC.
-* Exibição visual da árvore sintática gerada e execução interativa via *tree-walker* (estilo REPL).
+* Otimizações sobre a IR (dobramento e propagação de constantes, eliminação de código morto), aplicadas em ponto fixo.
+* Execução do código por meio de interpretação direta da IR otimizada (`ir_exec`).
+* Exibição da árvore sintática e do TAC (antes e depois da otimização) para fins didáticos.
 * Desalocação completa de memória pós-ordem (`free_ast()`), garantindo execução livre de vazamentos de memória.
 
 ### O que NÃO CONSEGUIMOS Fazer (Limitações Atuais)

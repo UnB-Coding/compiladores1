@@ -27,10 +27,11 @@ Esse formato é exatamente sobre o qual algoritmos clássicos de otimização op
 Léxico (Flex) → Sintático (Bison) → AST
       → Análise Semântica
       → Geração de IR (TAC)   ← esta fase
-      → Execução (eval_ast)
+      → Otimização da IR (ir_optimize)
+      → Execução (ir_exec)
 ```
 
-A geração ocorre **antes** da execução e é totalmente independente dela: nenhum valor é calculado e nenhuma I/O acontece. A função `gen_ir()` retorna um `IRProgram*` que pode ser impresso (`ir_print()`) e liberado (`ir_free()`).
+A geração ocorre **antes** da execução e é totalmente independente dela: nenhum valor é calculado e nenhuma I/O acontece. A função `gen_ir()` retorna um `IRProgram*` que pode ser impresso (`ir_print()`), otimizado (`ir_optimize()`) e liberado (`ir_free()`). A IR — e não a AST — é o **único caminho de execução** do interpretador.
 
 ## Modelo de instruções
 
@@ -126,6 +127,17 @@ L0:
 L1:
 ```
 
+## Otimização da IR — `ir_optimize()`
+
+Depois de gerada, a IR é refinada **in-place** por `ir_optimize()`, que executa quatro passes repetidamente até atingir um **ponto fixo** (nenhuma mudança em uma iteração completa):
+
+- **Dobramento de constantes** (*constant folding*) — avalia em tempo de compilação operações cujos operandos já são constantes (`t0 = 3 * 4` → `t0 = 12`).
+- **Propagação de constantes** (*constant propagation*) — substitui usos de um temporário/variável cujo valor é uma constante conhecida pela própria constante, alimentando novas rodadas de dobramento.
+- **Eliminação de temporários mortos** (*dead-temp elimination*) — remove atribuições a temporários que nunca são lidos depois.
+- **Limpeza de fluxo de controle** — elimina rótulos órfãos (sem desvio que os alcance) e `goto`s redundantes.
+
+Como o `main()` executa a IR **já otimizada**, a saída auto-impressa do programa reflete essas transformações. O TAC é impresso duas vezes — antes e depois da otimização — para tornar o efeito visível.
+
 ## Testes
 
-Os testes em `tests/test_ir.py` alimentam o `parser_exe` com código-fonte e verificam o bloco TAC emitido — cobrindo expressões, precedência, cópias, declarações sem inicialização e os três tipos de controle de fluxo (incluindo aninhamento).
+Os testes em `tests/test_ir.py` alimentam o `parser_exe` com código-fonte e verificam o bloco TAC emitido — cobrindo expressões, precedência, cópias, declarações sem inicialização e os três tipos de controle de fluxo (incluindo aninhamento). Os testes em `tests/test_ir_optimize.py` validam especificamente o resultado de `ir_optimize()` (dobramento e propagação de constantes, eliminação de código morto).

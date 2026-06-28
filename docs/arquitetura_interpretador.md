@@ -7,33 +7,35 @@
 
 ## 1. Visão Geral do Pipeline
 
-O interpretador opera em um pipeline de **três fases sequenciais**, onde a saída de cada fase é a entrada da próxima. Diferentemente de um compilador convencional (que gera código objeto), nosso projeto interpreta o programa-fonte diretamente: constrói uma representação intermediária em memória (a AST) e a percorre para executar cada instrução.
+O interpretador opera em um pipeline de **fases sequenciais**, onde a saída de cada fase é a entrada da próxima. Diferentemente de um compilador convencional (que gera código objeto), nosso projeto interpreta o programa-fonte: a partir da AST ele gera uma **representação intermediária linear** (Código de Três Endereços), otimiza-a e a executa diretamente.
 
 ```
-┌──────────────┐     tokens     ┌──────────────┐      AST      ┌──────────────┐
-│   Scanner    │───────────────▶│    Parser     │──────────────▶│  Avaliador   │
-│   (Flex)     │                │   (Bison)     │               │  (eval_ast)  │
-│  scanner.l   │                │   parser.y    │               │    ast.c     │
-└──────────────┘                └──────────────┘               └──────────────┘
-                                                                      │
-                                                                      ▼
-                                                               ┌──────────────┐
-                                                               │   Tabela de  │
-                                                               │   Símbolos   │
-                                                               │   symtab.c   │
-                                                               └──────────────┘
+┌──────────┐ tokens ┌──────────┐  AST  ┌───────────┐  AST  ┌──────────┐  TAC  ┌────────────┐  TAC  ┌──────────┐
+│ Scanner  │───────▶│  Parser  │──────▶│ Semântica │──────▶│   IR     │──────▶│ ir_optimize│──────▶│ ir_exec  │
+│ (Flex)   │        │ (Bison)  │       │semantic.c │       │ (gen_ir) │       │            │       │          │
+│scanner.l │        │ parser.y │       │           │       │  ir.c    │       │   ir.c     │       │  ir.c    │
+└──────────┘        └──────────┘       └───────────┘       └──────────┘       └────────────┘       └────┬─────┘
+                                             │                                                          │
+                                             ▼                                                          ▼
+                                       ┌──────────┐                                              ┌──────────┐
+                                       │ Tabela de│                                              │ Tabela de│
+                                       │ Símbolos │◀─────────────────────────────────────────────│ Símbolos │
+                                       │ symtab.c │                                              │ symtab.c │
+                                       └──────────┘                                              └──────────┘
 ```
 
 **Fluxo de execução do `main()` (em `parser.y`):**
 
-1. O Bison invoca `yyparse()`, que chama `yylex()` repetidamente para obter tokens.
+1. O Bison invoca `yyparse()`, que chama `yylex()` repetidamente para obter tokens. Erros léxicos (caracteres não reconhecidos) abortam a execução antes de qualquer fase posterior.
 2. As ações semânticas do parser **apenas constroem nós da AST** — nenhum cálculo, I/O ou manipulação da tabela de símbolos ocorre nesta fase.
-3. Após o parsing bem-sucedido, `ast_root` aponta para a raiz da AST.
-4. A AST é impressa para depuração (`print_ast`).
-5. O avaliador percorre a AST nó a nó via `eval_ast()`, executando o programa.
-6. A tabela de símbolos é impressa e toda memória é liberada.
+3. Após o parsing bem-sucedido, `ast_root` aponta para a raiz da AST, que é impressa para depuração (`print_ast`).
+4. **Análise semântica** (`analyze_ast`) percorre a árvore inteira — inclusive ramos e corpos de laço não executados — detectando erros estáticos. Se houver erros, o programa encerra sem executar.
+5. **Geração de IR** (`gen_ir`) percorre a AST e produz o Código de Três Endereços (TAC), impresso com `ir_print`.
+6. **Otimização** (`ir_optimize`) aplica dobramento de constantes, propagação de constantes e eliminação de código morto *in-place*, até um ponto fixo; o TAC otimizado é impresso novamente.
+7. **Execução** (`ir_exec`) interpreta a IR otimizada, manipulando a tabela de símbolos e produzindo a saída do programa.
+8. A tabela de símbolos final é impressa (`sym_print`) e toda a memória é liberada (`ir_free`, `free_ast`, `sym_free`).
 
-> **Decisão de projeto chave:** a separação rigorosa entre construção da AST (parsing) e execução (avaliação) permite, no futuro, inserir fases intermediárias (otimização, geração de código) sem alterar o parser.
+> **Decisão de projeto chave:** a separação rigorosa entre construção da AST (parsing) e execução permite inserir fases intermediárias (análise semântica, geração e otimização de IR) sem alterar o parser. A AST **não é mais executada diretamente** — o antigo avaliador *tree-walking* (`eval_ast`) foi aposentado, e a IR é hoje o **único caminho de execução**.
 
 ---
 
@@ -193,7 +195,7 @@ O campo `next` na **base** da struct (fora da union) permite que **qualquer** ti
 
 Esse padrão é chamado de **lista intrusiva** (*intrusive list*): o ponteiro de encadeamento faz parte do próprio elemento, não de um container externo.
 
-> **Detalhe crítico:** `eval_ast()` **NÃO** percorre `->next` automaticamente. A responsabilidade de iterar a lista é da função `exec_list()` ou do loop no `main()`. Isso permite que `eval_ast()` avalie um único nó de forma isolada (necessário para subexpressões, condições, etc.).
+> **Detalhe crítico:** os percorredores da AST (`gen_list()` em `ir.c`, `analyze_list()` em `semantic.c`) tratam um **único** nó e **NÃO** seguem `->next` automaticamente. A responsabilidade de iterar a lista é do chamador. Isso permite processar um único nó de forma isolada (necessário para subexpressões, condições, etc.).
 
 ### 4.3 Codificação de operadores
 
@@ -220,22 +222,27 @@ Essa codificação evita a necessidade de um enum separado para operadores e per
 
 ---
 
-## 5. Avaliador (Interpretador) — `eval_ast()`
+## 5. Análise Semântica, IR e Execução
 
-O avaliador é o coração do interpretador: um **tree-walking interpreter** que percorre a AST recursivamente e executa o programa.
+A AST **não é executada diretamente**. Entre o parsing e a execução há três fases: análise semântica, geração de IR e otimização de IR. A execução, então, interpreta a IR otimizada.
 
-### 5.1 O tipo `EvalResult`
+### 5.0 Análise Semântica — `analyze_ast()`
 
-Toda expressão avaliada retorna um `EvalResult`:
+Antes de qualquer geração de código, `analyze_ast()` (em `semantic.c`) percorre a árvore inteira — **inclusive ramos e corpos de laço que talvez nunca executem** — e retorna a contagem de erros (`0` = ok). Detecta:
 
-```c
-typedef struct {
-    double val;    // Valor numérico (double para uniformidade)
-    SymType type;  // Tipo semântico do resultado
-} EvalResult;
-```
+- **Uso de variável não declarada.**
+- **Redeclaração** de variável (escopo global único).
+- **Divisão por zero literal** (ex.: `x / 0`), detectável estaticamente.
 
-**Decisão de projeto:** usar `double` como tipo interno universal simplifica a implementação — não é necessário um segundo nível de union para resultados intermediários. O campo `type` preserva a informação semântica para conversões e formatação.
+Avisos não-fatais (ex.: conversões com perda de precisão) são emitidos em `stderr` sem contar como erros. Se `analyze_ast()` retorna um valor positivo, o `main()` encerra **sem gerar IR nem executar**.
+
+### 5.1 Geração e Execução via IR
+
+Concluída a análise semântica, `gen_ir()` traduz a AST para Código de Três Endereços (TAC) — descrito em detalhe em [Código Intermediário](codigo_intermediario.md) — e `ir_optimize()` o refina. A execução do programa é então realizada por **`ir_exec()`**, que interpreta a lista linear de quádruplas com um ponteiro de instrução e um mapa de rótulos. Não há mais um *tree-walker*: a IR é o **único caminho de execução**.
+
+Valores intermediários são carregados como um `double` (o tipo interno universal) acompanhado de uma *tag* `SymType`. Usar `double` simplifica a implementação — não é necessário um segundo nível de union para resultados intermediários — e o `SymType` preserva a informação semântica para conversões e formatação.
+
+> **Importante:** como `ir_exec()` interpreta a IR **otimizada**, a saída auto-impressa já reflete o dobramento de constantes e a eliminação de código morto.
 
 ### 5.2 Sistema de tipos e promoção
 
@@ -262,9 +269,11 @@ result.val = left.val / right.val;
 
 Exemplo: `7 / 2` → `3` (inteiro), mas `7.0 / 2` → `3.5` (float).
 
-### 5.4 Divisão por zero
+### 5.4 Divisão por zero e overflow de divisão inteira
 
-Divisão por zero é detectada em tempo de execução e causa **término imediato** do programa com mensagem de erro. No C padrão, divisão inteira por zero é *undefined behavior*; aqui, o comportamento é determinístico.
+Divisão por zero — **tanto inteira quanto de ponto flutuante** — é detectada em tempo de execução por `ir_exec()` e causa **término imediato** do programa com mensagem de erro. No C padrão, divisão inteira por zero é *undefined behavior*; aqui, o comportamento é determinístico.
+
+Além disso, o caso de **overflow de divisão inteira** (`INT_MIN / -1`, cujo quociente não cabe em `int`) também é verificado em tempo de execução e tratado como erro fatal, em vez de produzir comportamento indefinido.
 
 ### 5.5 Operadores lógicos e relacionais
 
@@ -272,7 +281,7 @@ Os operadores lógicos (`&&`, `||`) e relacionais (`<`, `>`, `<=`, `>=`, `==`, `
 
 ### 5.6 Conversão na atribuição
 
-Ao atribuir um valor a uma variável, `to_sym_value()` converte o `double` intermediário para o tipo declarado da variável:
+Ao atribuir um valor a uma variável, `ir_exec()` converte o `double` intermediário para o tipo declarado da variável antes de gravá-lo na tabela de símbolos:
 
 ```c
 // float x; x = 42;  → x armazena 42.0f
@@ -294,12 +303,16 @@ Isso é uma conveniência educacional — no C padrão, nenhuma dessas operaçõ
 
 ### 5.8 Controle de fluxo
 
+Na IR, todo controle de fluxo é compilado para **rótulos** e **desvios** (`IR_LABEL`, `IR_GOTO`, `IR_IFFALSE`); `ir_exec()` apenas segue o ponteiro de instrução. A semântica resultante é:
+
 | Construção | Comportamento |
 |------------|--------------|
-| `if/else` | Avalia a condição como `double != 0.0` (truthy). Executa o branch apropriado via `exec_list()`. |
-| `while` | Loop infinito com teste de condição no início. Sai quando a condição é `0.0`. |
-| `for` | Executa init uma vez, depois loop com teste de condição, corpo, e step. Todos os componentes são opcionais (condição omitida = loop infinito). |
-| Blocos `{}` | Executa a lista de statements sequencialmente via `exec_list()`. |
+| `if/else` | Avalia a condição como `double != 0.0` (truthy); `ifFalse` desvia para o ramo `else` (ou para depois do `if`). |
+| `while` | Teste de condição no início; `ifFalse` sai do laço, `goto` retorna ao topo. |
+| `for` | Executa init uma vez, depois laço com teste de condição, corpo e step. Todos os componentes são opcionais (condição omitida = laço infinito). |
+| Blocos `{}` | Não criam escopo; suas instruções são apenas emitidas em sequência na IR. |
+
+A tradução exata de cada construção para TAC está documentada em [Código Intermediário](codigo_intermediario.md).
 
 ### 5.9 ⚠️ Diferenças na avaliação em relação ao C padrão
 
@@ -363,23 +376,19 @@ O campo `type` da `SymEntry` determina qual membro da union é válido. `TYPE_BO
 
 ## 7. Compilação e Build — `Makefile`
 
-O sistema de build compila dois executáveis independentes:
+O sistema de build produz **um único executável**, `parser_exe` (o interpretador). Não há mais um lexer standalone: o antigo `examples/lexer.l` e seu `lexer_exe` foram aposentados.
 
 ### 7.1 `parser_exe` — O interpretador principal
 
 ```
 Bison (parser.y) → parser.tab.c + parser.tab.h
 Flex  (scanner.l) → lex.yy.c    (depende de parser.tab.h)
-GCC: parser.tab.c + lex.yy.c + symtab.c + ast.c → parser_exe
+GCC: parser.tab.c + lex.yy.c + symtab.c + ast.c + semantic.c + ir.c → parser_exe
 ```
 
 Não linka com `-lfl` porque `parser.y` fornece `main()` e `scanner.l` fornece `yywrap()`.
 
-### 7.2 `lexer_exe` — Lexer standalone
-
-Um analisador léxico independente (`examples/lexer.l`) que reconhece um subconjunto maior do C (incluindo comentários, `long`, `double`, `switch`, etc.). Utiliza `-lfl` para obter o `main()` padrão do Flex.
-
-### 7.3 Diretório de build
+### 7.2 Diretório de build
 
 Todos os artefatos gerados (`.tab.c`, `.tab.h`, `.yy.c`, executáveis) ficam no diretório `build/`, mantendo o diretório-fonte limpo.
 
@@ -391,12 +400,13 @@ O projeto utiliza **pytest** como framework de testes, com executáveis C compil
 
 ```
 pytest (Python)
-  ├─ test_lexer.py    → invoca lexer_test_exe (C)
-  ├─ test_scanner.py  → invoca scanner_test_exe (C)
-  └─ test_parser.py   → invoca parser_exe (C)
+  ├─ test_scanner.py      → invoca scanner_test_exe (C, via fixture `scan`)
+  ├─ test_parser.py       → invoca parser_exe       (C, via fixture `parse`)
+  ├─ test_ir.py           → invoca parser_exe e verifica o bloco TAC emitido
+  └─ test_ir_optimize.py  → invoca parser_exe e verifica a IR após otimização
 ```
 
-Os testes em Python escrevem arquivos temporários com programas-fonte, invocam o executável correspondente via `subprocess`, e verificam a saída padrão com asserções.
+Os testes em Python alimentam o executável com programas-fonte via `stdin`, invocando-o através de `subprocess`, e verificam `stdout`/`stderr`/código de retorno com asserções. As fixtures de `conftest.py` regeneram e compilam os binários necessários em `build/` no primeiro uso. (Os antigos `test_lexer.py`/`lexer_test_exe` foram consolidados em `test_scanner.py`.)
 
 ---
 
@@ -408,17 +418,29 @@ graph TD
     C[parser.y] -->|gera| B
     C -->|inclui| D[ast.h]
     C -->|inclui| E[symtab.h]
+    C -->|inclui| H[semantic.h]
+    C -->|inclui| I[ir.h]
     D -->|inclui| E
     F[ast.c] -->|inclui| D
     F -->|inclui| E
     G[symtab.c] -->|inclui| E
+    J[semantic.c] -->|inclui| H
+    H -->|inclui| D
+    H -->|inclui| E
+    K[ir.c] -->|inclui| I
+    I -->|inclui| D
+    I -->|inclui| E
 
     style A fill:#4a9eff,color:#fff
     style C fill:#4a9eff,color:#fff
     style F fill:#ff9f43,color:#fff
     style G fill:#ff9f43,color:#fff
+    style J fill:#ff9f43,color:#fff
+    style K fill:#ff9f43,color:#fff
     style D fill:#a29bfe,color:#fff
     style E fill:#a29bfe,color:#fff
+    style H fill:#a29bfe,color:#fff
+    style I fill:#a29bfe,color:#fff
     style B fill:#636e72,color:#fff
 ```
 

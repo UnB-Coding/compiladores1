@@ -32,8 +32,10 @@ nav:
     - Como Executar: como_executar.md
     - Analisador Léxico (Flex): lexer.md
     - Analisador Sintático (Bison): parser.md
+    - Código Intermediário (TAC): codigo_intermediario.md
     - Tabela de Símbolos e Tipagem: guia_gramatica.md
     - Explicação dos Arquivos: explicacao_arquivos.md
+    - Arquitetura do Interpretador: arquitetura_interpretador.md
     - Testes e Qualidade: tests.md
   - Contribuição: contributing.md
   - Relatórios:

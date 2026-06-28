@@ -5,26 +5,24 @@ Este documento detalha o propósito e o funcionamento interno de cada arquivo e 
 ---
 
 ## 1. `Makefile`
-**Propósito:** Arquivo de configuração lido pela ferramenta `make`. Ele automatiza todo o processo de compilação, traduzindo as gramáticas do Bison e as regras do Flex para código C, e depois compilando tudo em executáveis.
+**Propósito:** Arquivo de configuração lido pela ferramenta `make`. Ele automatiza todo o processo de compilação, traduzindo a gramática do Bison e as regras do Flex para código C, e depois compilando tudo em **um único executável** (`parser_exe`, o interpretador).
 
-* **Configuração de Variáveis:** Define os caminhos de diretórios (`build`), os nomes dos arquivos fonte (`parser.y`, `scanner.l`, `lexer/lexer.l`), os arquivos gerados, as flags do compilador (`CC = gcc`, `CFLAGS`) e as bibliotecas necessárias para o Flex (`LDFLAGS = -lfl`).
+* **Configuração de Variáveis:** Define o diretório de saída (`build`), os arquivos-fonte (`src/parser.y`, `src/scanner.l`), os arquivos gerados e as flags do compilador (`CC = gcc`, `CFLAGS = -I. -Isrc -Isymbol_table`). Note que `LDFLAGS` é **vazio**: como `parser.y` fornece `main()` e `scanner.l` fornece `yywrap()`, **não** é necessário linkar a biblioteca do Flex (`-lfl`).
 ```makefile
-# Nome dos executáveis e diretórios
+# Nome do executável e diretório
 EXEC       = $(BUILD_DIR)/parser_exe
-LEXER_EXEC = $(BUILD_DIR)/lexer_exe
 BUILD_DIR  = build
 
 # Parâmetros de compilação
 CC      = gcc
-CFLAGS  = -I. -Isymbol_table
-LDFLAGS = -lfl     # biblioteca do Flex (em algumas distros, pode ser -ll)
+CFLAGS  = -I. -Isrc -Isymbol_table
+LDFLAGS =          # sem -lfl: parser.y tem main(), scanner.l tem yywrap()
 ```
-* **Regras Padrão e de Diretório:** A regra `all` define que, por padrão, o interpretador e o lexer standalone devem ser construídos. A regra `$(BUILD_DIR)` garante que a pasta `build` seja criada antes da compilação.
-* **Lexer Standalone:** Regras para compilar `lexer/lexer.l`. Chama o `flex` para gerar `lexer.yy.c` e depois usa o `gcc` para gerar o executável `lexer_exe`.
-* **Parser Principal:** Define as regras para gerar o interpretador (`parser_exe`). Primeiro, roda o `bison` em `parser.y` (gerando `.tab.c` e `.tab.h`). Em seguida, roda o `flex` em `scanner.l`. Por fim, compila o código gerado pelo Bison, o código gerado pelo Flex e a tabela de símbolos (`symtab.c`) em um único binário.
+* **Regras Padrão e de Diretório:** A regra `all` constrói apenas o interpretador (`parser_exe`). A regra `$(BUILD_DIR)` garante que a pasta `build` exista antes da compilação.
+* **Parser Principal:** Primeiro roda o `bison` em `parser.y` (gerando `.tab.c` e `.tab.h`); depois roda o `flex` em `scanner.l` (que depende do `.tab.h`). Por fim, compila o código gerado pelo Bison e pelo Flex junto com a tabela de símbolos (`symtab.c`), a AST (`ast.c`), a análise semântica (`semantic.c`) e a geração/execução de IR (`ir.c`) em um único binário.
 ```makefile
-$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c $(LDFLAGS)
+$(EXEC): $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c src/semantic.c src/ir.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(BISON_C) $(FLEX_C) symbol_table/symtab.c src/ast.c src/semantic.c src/ir.c $(LDFLAGS)
 
 $(BISON_C) $(BISON_H): $(BISON_FILE) | $(BUILD_DIR)
 	bison $(BISON_FLAGS) --defines=$(BISON_H) -o $(BISON_C) $(BISON_FILE)
@@ -32,46 +30,37 @@ $(BISON_C) $(BISON_H): $(BISON_FILE) | $(BUILD_DIR)
 $(FLEX_C): $(FLEX_FILE) $(BISON_H) | $(BUILD_DIR)
 	flex $(FLEX_FLAGS) -o $(FLEX_C) $(FLEX_FILE)
 ```
-* **Regras de Teste e Limpeza:** Inclui uma regra (`lexer_test`) para compilar uma versão de teste do lexer e uma regra `clean` para excluir rapidamente todos os binários e códigos C gerados (`rm -f`).
+* **Limpeza:** A regra `clean` remove rapidamente o binário e os códigos C gerados pelo Flex/Bison (`rm -f`). (Os testes em `pytest` compilam seus próprios binários de teste via `conftest.py`, fora do `Makefile`.)
 
 ---
 
 ## 2. `parser.y`
 **Propósito:** Este é o coração do parser (Analisador Sintático). Escrito usando a sintaxe do Bison, ele define as regras gramaticais da linguagem, a precedência de operadores e o comportamento (ações semânticas) quando uma expressão é reconhecida.
 
-* **Prólogo C (`%{ ... %}`):** Código C que é copiado diretamente para o topo do arquivo C gerado pelo Bison. Inclui os cabeçalhos (como `symtab.h`), funções utilitárias para conversão e promoção de tipos (`promote_type`, `to_sym_value`), e implementa uma pilha de execução condicional (`g_exec`, `g_exec_stack`) para controlar blocos de `if/else`.
-* **Definições Bison (`%union`, `%token`, `%type`, `%left`):** 
-    * `%union`: Define os tipos de dados que os tokens podem carregar (inteiros, decimais, strings ou valores de expressão avaliados).
+* **Prólogo C (`%{ ... %}`):** Código C copiado para o topo do arquivo gerado pelo Bison. Inclui os cabeçalhos das fases seguintes (`ast.h`, `semantic.h`, `ir.h`, `symtab.h`) e declara a raiz global da AST (`ast_root`). **Nenhuma** lógica de avaliação ou de tabela de símbolos vive aqui — isso é responsabilidade das fases posteriores.
+* **Definições Bison (`%union`, `%token`, `%type`, `%left`):**
+    * `%union`: Define os tipos que os símbolos podem carregar. Crucialmente, expressões e comandos carregam um **ponteiro para nó da AST** (`struct ASTNode *node`), e não um valor já calculado.
     * `%token`: Declara todos os terminais (palavras-chave, operadores, literais).
     * `%left` e `%right`: Resolve ambiguidades ditando a precedência e associatividade matemática (ex: `*` tem maior precedência que `+`).
 ```yacc
 %union {
-    int    intValue;    /* NUM, literais booleanos, type_spec */
-    double floatValue;  /* FLOAT_LIT */
-    char   charValue;   /* CHAR_LIT */
-    char  *strValue;    /* identificadores */
-    struct {
-        double val;     /* valor numérico (double para uniformidade) */
-        int    type;    /* SymType do resultado */
-    } exprVal;          /* expressões tipadas */
+    int    intValue;       /* NUM, literais booleanos, type_spec */
+    double floatValue;     /* FLOAT_LIT */
+    char   charValue;      /* CHAR_LIT */
+    char  *strValue;       /* identificadores */
+    struct ASTNode *node;  /* nós da AST (expressões e comandos) */
 }
 
 %token <intValue>   NUM
 %token <strValue>   ID
-%type <exprVal>     expr
+%type <node>        expr
 ```
-* **Regras de Fluxo e Declaração:** Define que um `program` é uma lista de linhas (`line_list`). Descreve como tratar a declaração de variáveis (`type_spec ID`), a atribuição e blocos condicionais. Durante a análise, se o fluxo do `if` permitir (`g_exec` verdadeiro), os valores são avaliados, inseridos na tabela de símbolos e impressos.
-* **Regras de Expressão (`expr`):** Contém a lógica de expressões matemáticas (`+`, `-`, `*`, `/`), lógicas (`AND`, `OR`, `NOT`) e relacionais (`==`, `<`). Aqui ocorre o comportamento de um *interpretador*: em vez de apenas montar uma árvore (AST), o código no Bison já executa os cálculos aritméticos imediatamente baseados na promoção de tipos (inteiros virando floats, se necessário).
+* **Invariante de projeto — apenas constrói AST:** As ações semânticas do parser **somente montam nós da AST**; nenhum cálculo, I/O ou acesso à tabela de símbolos ocorre durante o parsing. Essa separação rigorosa entre *analisar* e *executar* é o invariante central do projeto: ela permite inserir as fases de análise semântica, geração e otimização de IR sem tocar no parser.
+* **Regras de Expressão (`expr`):** Cada produção apenas invoca um construtor de nó (`new_binop_node`, `new_unaryop_node`, `new_num_node`, …) e devolve o ponteiro resultante. A aritmética em si só acontece muito depois, em `ir_exec()`.
 ```yacc
-expr PLUS expr    {
-    $$.type = promote_type($1.type, $3.type);
-    if ($$.type == TYPE_FLOAT)
-        $$.val = $1.val + $3.val;
-    else
-        $$.val = (double)((int)$1.val + (int)$3.val);
-}
+expr PLUS expr    { $$ = new_binop_node('+', $1, $3); }
 ```
-* **Epílogo C (`%% ...`):** Contém a função `main()` do projeto. Ela chama `yyparse()` para iniciar o parsing do texto de entrada. Ao terminar, ela imprime o estado final da tabela de símbolos e libera a memória alocada. Também implementa `yyerror` para reportar falhas sintáticas.
+* **Epílogo C (`%% ...`):** Contém a função `main()` do projeto. Ela chama `yyparse()` (que constrói a AST) e então orquestra as fases seguintes: impressão da AST, análise semântica (`analyze_ast`), geração de IR (`gen_ir`), otimização (`ir_optimize`), execução (`ir_exec`), impressão da tabela de símbolos e liberação de memória. Também implementa `yyerror` para reportar falhas sintáticas.
 
 ---
 
@@ -99,32 +88,12 @@ expr PLUS expr    {
 
 ---
 
-## 4. `lexer/lexer.l`
-**Propósito:** Este arquivo é apenas um **modelo/mockup** para testes. Durante o desenvolvimento, foi necessário rodar e testar o analisador léxico de forma isolada, antes do parser estar pronto. Por isso, este arquivo foi criado de forma "standalone", utilizando uma estrutura própria de `enum` para definir os tokens no lugar de receber as definições reais do Bison.
+## 4. Lexer standalone (`examples/lexer.l`) — **aposentado**
 
-!!! note "Atenção"
-    O analisador léxico oficial e funcional que o projeto compila e utiliza de verdade é o **`scanner.l`**, pois ele foi implementado em conjunto com a análise sintática do **`parser.y`**. O Makefile inclui `lexer.l` apenas para permitir sua execução autônoma (rodar o lexer sozinho).
+!!! warning "Componente removido"
+    Versões antigas do projeto incluíam um analisador léxico *standalone* (`examples/lexer.l`, com seu próprio `lexer_exe` e a máquina de testes `test_lexer.py`). Ele usava um `enum` próprio de tokens, em vez de receber as definições do Bison, e reconhecia um subconjunto maior do C (comentários, `long`, `double`, `switch`, strings, notação científica).
 
-* **Prólogo C:** Declara a variável global `line_number` para rastrear as linhas e gerar boas mensagens de erro. Como foi feito para rodar sem o Bison, ele mesmo define o bloco `enum` temporário com todos os tokens possíveis (`KW_INT`, `OP_PLUS`, `LBRACE`, etc.).
-```c
-enum {
-    KW_INT = 256, KW_FLOAT, KW_CHAR, KW_LONG,
-    OP_PLUS, OP_MINUS, OP_MULT, OP_DIV,
-    IDENTIFIER, LBRACE, RBRACE
-    // ...
-};
-```
-* **Regras de Comentários:** Identifica e descarta os blocos de comentários de linha única (`//`) e de múltiplas linhas (`/* ... */`). Para comentários multi-linhas, ele tem o cuidado de contar as quebras de linha internas para não dessincronizar o contador `line_number`.
-```lex
-"/*"([^*]|\*+[^*/])*\*+"/"     {
-    for (int i = 0; yytext[i]; i++) {
-        if (yytext[i] == '\n') line_number++;
-    }
-}
-```
-* **Palavras-Chave de C:** Detecta os tipos primitivos avançados (long, double, unsigned) e controle de fluxo complexo (switch, do, break).
-* **Operadores, Delimitadores e Literais:** Regex similares, porém ampliadas para suportar strings entre aspas duplas e floats em notação científica (ex: `1.2e-4`). Preocupa-se com o "Maximal Munch" (analisar o maior tamanho possível): verifica operadores duplos (como `==`) antes dos simples (como `=`).
-* **Tratamento de Nova Linha e Erros:** Incrementa o `line_number` sempre que a regex encontra um `\n`. Se o código fornecer um caractere inválido, exibe uma notificação de erro informando a linha precisa.
+    Esse lexer foi **retirado**. O único analisador léxico do projeto é hoje o **`scanner.l`** (Seção 3), que opera integrado ao `parser.y`. Não reintroduza referências a `lexer.l`, `lexer_exe` ou `test_lexer.py`. Os testes léxicos vivem agora em `tests/test_scanner.py`.
 
 ---
 
@@ -188,7 +157,7 @@ SymEntry *sym_lookup(const char *name) {
 ---
 
 ## 7. `ast.h` e `ast.c`
-**Propósito:** Definem a **Árvore Sintática Abstrata (AST)**. Essa estrutura permite a separação entre a etapa de análise sintática (parsing) e a etapa de execução (avaliação). O parser constrói a árvore e, após sua conclusão, o interpretador a percorre para executar o programa.
+**Propósito:** Definem a **Árvore Sintática Abstrata (AST)**. Essa estrutura permite a separação entre a etapa de análise sintática (parsing) e as fases posteriores. O parser constrói a árvore; depois, a análise semântica a valida e a geração de IR a traduz para TAC. O `ast.c` contém **apenas** construtores de nós, `print_ast()` e `free_ast()` — **nenhuma execução**.
 
 ### Estrutura do Nó da Árvore (`ast.h`)
 O cabeçalho define um enumerador (`NodeType`) para os tipos de nós suportados, como comandos condicionais (`IF`), laços de repetição (`WHILE`), literais e operações binárias. A `struct ASTNode` implementa uma `union` para otimização de memória, armazenando os dados específicos estritamente necessários de acordo com o tipo de nó atual:
@@ -214,18 +183,11 @@ typedef struct ASTNode {
 } ASTNode;
 ```
 
-### O Avaliador da Árvore (`eval_ast` em `ast.c`)
-A execução do programa é realizada através da função `eval_ast`. Essa função recursiva avalia a árvore nó por nó executando a ação correspondente ao `NodeType`. No exemplo de um laço de repetição `AST_WHILE`, a função avalia a condição do nó filho e executa a ramificação do corpo recursivamente enquanto a condição for verdadeira:
-```c
-    case AST_WHILE: {
-        while (1) {
-            EvalResult cond = eval_ast(node->data.while_stmt.cond);
-            if (cond.val == 0.0) break;
-            exec_list(node->data.while_stmt.body); // Executa o corpo do laço
-        }
-        break;
-    }
-```
+!!! note "A AST não é mais executada diretamente"
+    Versões antigas do projeto executavam o programa percorrendo a AST com um avaliador *tree-walking* (`eval_ast`, com o tipo `EvalResult`). Esse avaliador foi **aposentado**: a AST é hoje traduzida para uma representação intermediária (TAC) por `gen_ir()`, e a execução acontece exclusivamente em `ir_exec()` (ver Seções 8 e 9). Não reintroduza um segundo motor de execução sobre a AST.
+
+### Codificação de operadores
+Os operadores binários e unários são guardados no campo `int op` do nó com uma convenção mista: caracteres ASCII para `+ - * / < > ! & |`, e mnemônicos para o restante — `'E'` (`==`), `'N'` (`!=`), `'l'` (`<=`), `'g'` (`>=`). Essa mesma codificação é reaproveitada nos operandos da IR.
 
 ### Limpeza de Memória (`free_ast` em `ast.c`)
 Como os nós da árvore são instanciados dinamicamente com `calloc()`, a função `free_ast` é responsável por liberar adequadamente toda a estrutura alocada. O método utiliza uma abordagem recursiva post-order (de baixo para cima), liberando os nós filhos antes de liberar o nó pai, prevenindo vazamentos de memória (memory leaks).
@@ -244,3 +206,27 @@ void free_ast(ASTNode *node) {
     free(node);
 }
 ```
+
+---
+
+## 8. `src/semantic.h` e `src/semantic.c`
+**Propósito:** Implementam a **análise semântica estática**, executada *após* o parsing e *antes* da geração de IR. A função pública `analyze_ast(ASTNode *root)` percorre a árvore inteira — inclusive ramos de `if/else` e corpos de laço que talvez nunca executem — e retorna a quantidade de erros encontrados (`0` significa programa válido).
+
+* **Erros detectados (fatais):**
+  * **Uso de variável não declarada** — referência a um identificador que nunca foi declarado.
+  * **Redeclaração** — declarar duas vezes a mesma variável (há apenas o escopo global único).
+  * **Divisão por zero literal** — expressões como `x / 0`, detectáveis estaticamente.
+* **Avisos (não-fatais):** Conversões com perda de precisão (ex.: atribuir `float` a `int`) são reportadas em `stderr`, mas **não** contam como erro.
+* **Iteração de listas:** assim como na geração de IR, o percorredor trata um único nó; a iteração sobre listas encadeadas (`->next`) fica a cargo do chamador (`analyze_list()`).
+
+Se `analyze_ast()` retorna um valor positivo, o `main()` aborta **sem** gerar IR nem executar.
+
+---
+
+## 9. `src/ir.h` e `src/ir.c`
+**Propósito:** Implementam a **geração, otimização e execução** do Código Intermediário (TAC). Esta é a **única via de execução** do interpretador. Uma descrição aprofundada do formato está em [Código Intermediário](codigo_intermediario.md).
+
+* **`gen_ir(root)`** — Percorre a AST e produz um `IRProgram`: uma **lista linear de quádruplas** (`IRInstr`). Cada instrução tem um opcode (`IR_COPY`, `IR_BINOP`, `IR_IFFALSE`, `IR_GOTO`, `IR_LABEL`, `IR_DECL`, `IR_PRINT`, …), um operador opcional e até três operandos. Constantes ficam **embutidas** nos operandos e cada operando carrega seu `SymType`.
+* **`ir_optimize(prog)`** — Otimiza a IR *in-place*, aplicando em **ponto fixo** quatro passes: dobramento de constantes, propagação de constantes, eliminação de temporários mortos e remoção de rótulos órfãos / `goto` redundantes.
+* **`ir_exec(prog)`** — Interpreta a IR otimizada: lineariza a lista, constrói um mapa de rótulos e executa cada instrução com um ponteiro de instrução, manipulando a tabela de símbolos. É aqui que a aritmética, as conversões de tipo, a divisão por zero (fatal) e a auto-impressão de resultados realmente acontecem.
+* **`ir_print(prog)`** / **`ir_free(prog)`** — Imprimem o TAC em formato legível e liberam toda a memória do programa IR, respectivamente.

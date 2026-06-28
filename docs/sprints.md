@@ -15,7 +15,7 @@ O projeto visa a construção de um interpretador educativo da linguagem C. O de
 ### Sprint 2: Analisador Sintático (Parser) e AST
 * **Objetivo:** Análise sintática completa e demonstração funcional (PC1).
 * **Implementação:** Analisador sintático desenvolvido com `Bison`, implementando regras para declarações, expressões e validação de precedência.
-* **Árvore Sintática:** Construção da AST com 14 tipos de nós diferentes, incluindo um avaliador interativo (*tree-walker*).
+* **Árvore Sintática:** Construção da AST com 14 tipos de nós diferentes, incluindo um avaliador interativo (*tree-walker*). *(Esse avaliador foi posteriormente aposentado — ver Sprints 4–5 —, passando a execução a ocorrer exclusivamente sobre a IR.)*
 * **Demo Visual:** Criação de um *pretty-printer* para impressão hierárquica da AST no terminal para facilitação de debug.
 
 ### Sprint 3: Semântica e Definição da IR
@@ -31,8 +31,8 @@ O projeto visa a construção de um interpretador educativo da linguagem C. O de
 
 ### Sprint 5: Otimização e Refinamento
 * **Objetivo da Fase:** Atuar sobre a Representação Intermediária para produzir código mais eficiente e limpo.
-* **Foco do Otimizador:** Planeamento da implementação de otimizações independentes da máquina diretamente na IR, utilizando técnicas como *constant folding* (resolução de expressões constantes em tempo de compilação), eliminação de código morto (*dead code elimination*) e propagação de constantes.
-* **Status Atual:** A finalização do otimizador foi oficialmente definida pela equipa como a prioridade principal e o que falta implementar para o fecho da próxima entrega.
+* **Foco do Otimizador:** Implementação de otimizações independentes da máquina diretamente na IR, utilizando técnicas como *constant folding* (resolução de expressões constantes em tempo de compilação), propagação de constantes e eliminação de código morto (*dead code elimination*), aplicadas em ponto fixo.
+* **Status Atual:** O otimizador (`ir_optimize`) está **implementado e integrado** ao pipeline, com testes dedicados em `test_ir_optimize.py`. Com a execução migrada para a IR otimizada, o antigo avaliador *tree-walking* da AST foi removido — a IR passou a ser o único caminho de execução.
 
 ### Sprint 6: Testes, QA e Code Freeze
 * **Objetivo:** Expansão de cobertura de testes e encerramento do desenvolvimento focado na documentação (*Code Freeze*).
