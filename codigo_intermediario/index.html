@@ -1,0 +1,1531 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentação do projeto de interpretador utilizando flex e bison.">
+      
+      
+        <meta name="author" content="Equipe">
+      
+      
+      
+        <link rel="prev" href="../parser/">
+      
+      
+        <link rel="next" href="../guia_gramatica/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Código Intermediário e Otimização - Compiladores 1</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#geracao-de-codigo-intermediario-otimizacao-e-execucao-tac" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href=".." title="Compiladores 1" class="md-header__button md-logo" aria-label="Compiladores 1" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Compiladores 1
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Código Intermediário e Otimização
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Mudar para modo escuro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Mudar para modo escuro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Mudar para modo claro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Mudar para modo claro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Abas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Início
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../como_executar/" class="md-tabs__link">
+          
+  
+  
+  Interpretador
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contribuição
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../sprints/" class="md-tabs__link">
+          
+  
+  
+  Relatórios
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Compiladores 1" class="md-nav__button md-logo" aria-label="Compiladores 1" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Compiladores 1
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpretador
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpretador
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../como_executar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Como Executar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arquitetura_interpretador/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura Geral
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lexer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analisador Léxico (Flex)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analisador Sintático (Bison)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Código Intermediário e Otimização
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Código Intermediário e Otimização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#por-que-codigo-intermediario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por que código intermediário?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#posicao-no-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Posição no pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#modelo-de-instrucoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modelo de instruções
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Modelo de instruções">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operandos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operandos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#traducao-do-controle-de-fluxo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tradução do controle de fluxo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tradução do controle de fluxo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#if-cond-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        if (cond) ... else ...
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#while-cond" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        while (cond) ...
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-init-cond-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        for (init; cond; step) ...
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otimizacao-do-ir-ir_optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Otimização do IR (ir_optimize)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Otimização do IR (ir_optimize)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pass-1-constant-folding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 1: Constant Folding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-2-constant-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 2: Constant Propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-3-dead-code-elimination-dce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 3: Dead Code Elimination (DCE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-4-dead-temp-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 4: Dead Temp Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-5-redundant-goto-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 5: Redundant Goto Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-6-dead-label-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 6: Dead Label Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execucao-do-ir-ir_exec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execução do IR (ir_exec)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exemplo-completo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exemplo completo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otimizacao-da-ir-ir_optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Otimização da IR — ir_optimize()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guia_gramatica/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tabela de Símbolos e Tipagem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explicacao_arquivos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explicação dos Arquivos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testes e Qualidade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribuição
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relatórios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Relatórios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sprints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sprints e Evolução
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#por-que-codigo-intermediario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por que código intermediário?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#posicao-no-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Posição no pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#modelo-de-instrucoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modelo de instruções
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Modelo de instruções">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operandos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operandos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#traducao-do-controle-de-fluxo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tradução do controle de fluxo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tradução do controle de fluxo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#if-cond-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        if (cond) ... else ...
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#while-cond" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        while (cond) ...
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-init-cond-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        for (init; cond; step) ...
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otimizacao-do-ir-ir_optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Otimização do IR (ir_optimize)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Otimização do IR (ir_optimize)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pass-1-constant-folding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 1: Constant Folding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-2-constant-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 2: Constant Propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-3-dead-code-elimination-dce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 3: Dead Code Elimination (DCE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-4-dead-temp-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 4: Dead Temp Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-5-redundant-goto-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 5: Redundant Goto Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pass-6-dead-label-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pass 6: Dead Label Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execucao-do-ir-ir_exec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execução do IR (ir_exec)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exemplo-completo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exemplo completo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otimizacao-da-ir-ir_optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Otimização da IR — ir_optimize()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="geracao-de-codigo-intermediario-otimizacao-e-execucao-tac">Geração de Código Intermediário, Otimização e Execução (TAC)</h1>
+<p>Esta seção descreve as fases de <strong>geração de código intermediário</strong>, <strong>otimização</strong> e <strong>execução</strong>, implementadas em <code>src/ir.c</code> e <code>src/ir.h</code>.</p>
+<p>Após a <a href="../guia_gramatica/">análise semântica</a> validar a AST, o interpretador a percorre uma última vez para produzir uma <strong>Representação Intermediária (IR)</strong> na forma de <strong>Código de Três Endereços</strong> (<em>Three-Address Code</em>, TAC). Essa representação linear é independente de máquina e serve de base para as otimizações e para a execução final.</p>
+<h2 id="por-que-codigo-intermediario">Por que código intermediário?</h2>
+<p>A AST é uma estrutura em árvore, conveniente para análise mas pouco prática para otimizar. A IR a "achata" em uma <strong>lista linear de instruções</strong>, cada uma com no máximo três endereços (um destino e até dois operandos):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>t0 = 3 * 4
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>t1 = 2 + t0
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>a  = t1
+</span></code></pre></div>
+<p>Esse formato é exatamente sobre o qual algoritmos clássicos de otimização operam.</p>
+<h2 id="posicao-no-pipeline">Posição no pipeline</h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Léxico (Flex) → Sintático (Bison) → AST
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>      → Análise Semântica (analyze_ast)
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>      → Geração de IR (gen_ir)        ← esta fase
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>      → Otimização (ir_optimize)      ← esta fase
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>      → Execução (ir_exec)            ← esta fase
+</span></code></pre></div>
+<h2 id="modelo-de-instrucoes">Modelo de instruções</h2>
+<p>Cada instrução é uma <strong>quádrupla</strong> (<code>IRInstr</code>) com um código de operação, um operador opcional e até três operandos:</p>
+<table>
+<thead>
+<tr>
+<th>Opcode</th>
+<th>Forma impressa</th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IR_COPY</code></td>
+<td><code>x = y</code></td>
+<td>cópia/atribuição</td>
+</tr>
+<tr>
+<td><code>IR_BINOP</code></td>
+<td><code>x = y &lt;op&gt; z</code></td>
+<td>operação binária</td>
+</tr>
+<tr>
+<td><code>IR_UNARYOP</code></td>
+<td><code>x = &lt;op&gt;y</code></td>
+<td>operação unária</td>
+</tr>
+<tr>
+<td><code>IR_LABEL</code></td>
+<td><code>Lk:</code></td>
+<td>define um rótulo</td>
+</tr>
+<tr>
+<td><code>IR_GOTO</code></td>
+<td><code>goto Lk</code></td>
+<td>desvio incondicional</td>
+</tr>
+<tr>
+<td><code>IR_IFFALSE</code></td>
+<td><code>ifFalse x goto Lk</code></td>
+<td>desvia se <code>x</code> for falso (zero)</td>
+</tr>
+<tr>
+<td><code>IR_DECL</code></td>
+<td><code>decl x : T</code></td>
+<td>declaração de variável</td>
+</tr>
+<tr>
+<td><code>IR_PRINT</code></td>
+<td><code>print x</code></td>
+<td>imprime resultado de <code>expr_stmt</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="operandos">Operandos</h3>
+<p>Um <code>IROperand</code> pode ser um <strong>temporário</strong> (<code>t0</code>, <code>t1</code>, …), uma <strong>variável</strong> nomeada, uma <strong>constante embutida</strong> (inteira, float, char ou bool) ou um <strong>rótulo</strong> (<code>L0</code>, <code>L1</code>, …).</p>
+<p>Decisões de projeto que favorecem otimizações:</p>
+<ul>
+<li><strong>Constantes ficam embutidas</strong> nos operandos em vez de materializadas em temporários, tornando o dobramento de constantes trivial.</li>
+<li>Cada operando <strong>carrega seu <code>SymType</code></strong>, habilitando análises sensíveis a tipo. Como a geração ocorre antes da execução, o módulo mantém seu próprio <em>ambiente de tipos</em> (<code>name → SymType</code>), preenchido a partir das declarações.</li>
+<li>Cada temporário recebe <strong>um único valor</strong> (estilo <em>SSA-friendly</em>), simplificando a análise de fluxo de dados.</li>
+</ul>
+<h2 id="traducao-do-controle-de-fluxo">Tradução do controle de fluxo</h2>
+<p>Comandos estruturados são traduzidos para rótulos e desvios.</p>
+<h3 id="if-cond-else"><code>if (cond) ... else ...</code></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>    t0 = cond
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    ifFalse t0 goto L0
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    &lt;then&gt;
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    goto L1
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>L0:
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    &lt;else&gt;
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>L1:
+</span></code></pre></div>
+<p>(Sem <code>else</code>, o <code>goto L1</code> é omitido e o ramo falso cai direto em <code>L0</code>.)</p>
+<h3 id="while-cond"><code>while (cond) ...</code></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>L0:
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    t0 = cond
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    ifFalse t0 goto L1
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    &lt;corpo&gt;
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    goto L0
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>L1:
+</span></code></pre></div>
+<h3 id="for-init-cond-step"><code>for (init; cond; step) ...</code></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>    &lt;init&gt;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>L0:
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    t0 = cond
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    ifFalse t0 goto L1
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    &lt;corpo&gt;
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    &lt;step&gt;
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    goto L0
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>L1:
+</span></code></pre></div>
+<p>Cada um dos três componentes do <code>for</code> é opcional; se ausente, sua parte correspondente é simplesmente omitida.</p>
+<h2 id="otimizacao-do-ir-ir_optimize">Otimização do IR (<code>ir_optimize</code>)</h2>
+<p>O otimizador executa <strong>6 passes</strong> em loop de ponto fixo (repete enquanto algum passe produzir mudanças):</p>
+<h3 id="pass-1-constant-folding">Pass 1: Constant Folding</h3>
+<p>Resolve operações <code>BINOP</code>/<code>UNARYOP</code> cujos operandos são todos constantes, convertendo-as em <code>COPY</code> com o resultado pré-calculado.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>    t0 = 10 + 20     →     t0 = 30
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    t1 = !false      →     t1 = 1
+</span></code></pre></div>
+Não dobra divisão por zero nem <code>INT_MIN / -1</code> (preserva o erro para a execução).</p>
+<h3 id="pass-2-constant-propagation">Pass 2: Constant Propagation</h3>
+<p>Identifica temporários que receberam constantes (<code>tN = const</code>) e substitui todos os usos de <code>tN</code> pela constante direta.</p>
+<h3 id="pass-3-dead-code-elimination-dce">Pass 3: Dead Code Elimination (DCE)</h3>
+<ul>
+<li><code>ifFalse &lt;const_false&gt; goto Lk</code> → converte em <code>goto Lk</code> e marca código seguinte como morto.</li>
+<li><code>ifFalse &lt;const_true&gt; goto Lk</code> → remove a instrução (condição sempre verdadeira, nunca desvia).</li>
+<li>Código após <code>goto</code> é removido até o próximo rótulo.</li>
+</ul>
+<h3 id="pass-4-dead-temp-elimination">Pass 4: Dead Temp Elimination</h3>
+<p>Remove definições de temporários (<code>tN = ...</code>) que nunca são lidos por nenhuma instrução. Surge tipicamente após a propagação de constantes deixar definições órfãs.</p>
+<h3 id="pass-5-redundant-goto-elimination">Pass 5: Redundant Goto Elimination</h3>
+<p>Remove <code>goto Lk</code> imediatamente seguido de <code>Lk:</code> — um desvio para a instrução seguinte é desnecessário.</p>
+<h3 id="pass-6-dead-label-elimination">Pass 6: Dead Label Elimination</h3>
+<p>Remove rótulos <code>Lk:</code> que não são referenciados por nenhum <code>goto</code> ou <code>ifFalse</code>. Surgem depois que o DCE e outras passes esvaziam blocos.</p>
+<h2 id="execucao-do-ir-ir_exec">Execução do IR (<code>ir_exec</code>)</h2>
+<p>O interpretador de IR executa o programa TAC (possivelmente otimizado):</p>
+<ol>
+<li><strong>Linearização:</strong> Converte a lista encadeada de instruções em um array indexável.</li>
+<li><strong>Mapa de rótulos:</strong> Constrói <code>label_map[Lk] = índice</code> para resolver desvios em O(1).</li>
+<li><strong>Interpretação:</strong> Percorre as instruções com um ponteiro de instrução (<code>ip</code>). Desvios alteram o <code>ip</code> para o índice do rótulo alvo.</li>
+<li><strong>Valores:</strong> Utiliza um array de <code>IRValue</code> (<code>{double val, SymType type}</code>) para temporários e a tabela de símbolos para variáveis nomeadas.</li>
+</ol>
+<h2 id="exemplo-completo">Exemplo completo</h2>
+<p>Entrada:</p>
+<div class="language-c highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">;</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>TAC gerado:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>    decl n : int (init)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    n = 0
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    decl i : int (init)
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    i = 0
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>L0:
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    t0 = i &lt; 3
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    ifFalse t0 goto L1
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    t1 = n + i
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    n = t1
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    t2 = i + 1
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    i = t2
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    goto L0
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>L1:
+</span></code></pre></div>
+<h2 id="otimizacao-da-ir-ir_optimize">Otimização da IR — <code>ir_optimize()</code></h2>
+<p>Depois de gerada, a IR é refinada <strong>in-place</strong> por <code>ir_optimize()</code>, que executa quatro passes repetidamente até atingir um <strong>ponto fixo</strong> (nenhuma mudança em uma iteração completa):</p>
+<ul>
+<li><strong>Dobramento de constantes</strong> (<em>constant folding</em>) — avalia em tempo de compilação operações cujos operandos já são constantes (<code>t0 = 3 * 4</code> → <code>t0 = 12</code>).</li>
+<li><strong>Propagação de constantes</strong> (<em>constant propagation</em>) — substitui usos de um temporário/variável cujo valor é uma constante conhecida pela própria constante, alimentando novas rodadas de dobramento.</li>
+<li><strong>Eliminação de temporários mortos</strong> (<em>dead-temp elimination</em>) — remove atribuições a temporários que nunca são lidos depois.</li>
+<li><strong>Limpeza de fluxo de controle</strong> — elimina rótulos órfãos (sem desvio que os alcance) e <code>goto</code>s redundantes.</li>
+</ul>
+<p>Como o <code>main()</code> executa a IR <strong>já otimizada</strong>, a saída auto-impressa do programa reflete essas transformações. O TAC é impresso duas vezes — antes e depois da otimização — para tornar o efeito visível.</p>
+<h2 id="testes">Testes</h2>
+<p>Os testes em <code>tests/test_ir.py</code> alimentam o <code>parser_exe</code> com código-fonte e verificam o bloco TAC emitido — cobrindo expressões, precedência, cópias, declarações sem inicialização e os três tipos de controle de fluxo (incluindo aninhamento).</p>
+<p>Os testes em <code>tests/test_ir_optimize.py</code> verificam as otimizações — cobrindo dobramento de constantes, propagação de constantes e eliminação de código morto, assegurando que o IR otimizado produz resultados corretos.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Voltar para o topo
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
